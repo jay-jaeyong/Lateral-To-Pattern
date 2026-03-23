@@ -1,0 +1,35 @@
+# 환경변수 (API 키 등) - 절대 Git에 업로드하지 마세요
+.env
+# 로컬에 보관하는 API 키 파일 (절대 커밋 금지)
+config/APIkey
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# 가상환경
+.venv/
+venv/
+env/
+
+# 출력 결과 (선택적으로 추적 제외)
+output/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# 로그
+*.log
