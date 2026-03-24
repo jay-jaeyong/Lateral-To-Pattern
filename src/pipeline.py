@@ -19,8 +19,6 @@ from config.prompts import PIPELINE_STEPS
 from src.gemini_client import GeminiClient, StepResponse
 from src.image_handler import ImageHandler
 from utils.output_handler import OutputHandler
-import io
-from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +106,7 @@ class Pipeline:
         pipeline_result = PipelineResult()
 
         for step_config in self._steps:
-            # 이전 단계에서 생성된 이미지를 다음 단계의 입력으로 포함시킵니다.
-            prev_images = pipeline_result.steps[-1].generated_images if pipeline_result.steps else []
-            step_result = self._run_step(step_config, previous_generated_images=prev_images)
+            step_result = self._run_step(step_config)
             pipeline_result.steps.append(step_result)
 
         # 최종 결과 저장
@@ -128,7 +124,7 @@ class Pipeline:
     # 단계 실행
     # ──────────────────────────────────────────────────
 
-    def _run_step(self, config: dict, previous_generated_images: list | None = None) -> StepResult:
+    def _run_step(self, config: dict) -> StepResult:
         """단일 파이프라인 단계를 실행합니다."""
         step_num = config["step"]
         name = config["name"]
@@ -139,60 +135,11 @@ class Pipeline:
 
         logger.info("─── Step %d: %s ───", step_num, description)
 
-        # 현재 Gemini가 가진 누적 채팅 히스토리(단계 시작 전)
-        chat_before = self._client.chat_history
-
         # 이미지 + 프롬프트 → parts 구성
         parts = ImageHandler.build_parts(prompt, image_path)
 
-        # 이전 단계에서 생성된 이미지를 parts 앞부분에 포함시켜서
-        # 모델이 바로 이전에 생성된 이미지를 입력으로 인식하도록 합니다.
-        if previous_generated_images:
-            normalized_prev: list = []
-            for img in previous_generated_images:
-                # 이미 PIL Image인 경우 그대로 사용
-                if isinstance(img, PILImage.Image):
-                    normalized_prev.append(img)
-                    continue
-
-                # google.genai.types.Image 같은 객체는 image_bytes 속성을 가지고 있을 수 있습니다.
-                img_bytes = getattr(img, "image_bytes", None)
-                if img_bytes:
-                    try:
-                        normalized_prev.append(PILImage.open(io.BytesIO(img_bytes)).convert("RGB"))
-                        continue
-                    except Exception:
-                        logger.warning("이전 생성 이미지 변환 실패 (bytes): %s", type(img))
-
-                # 일부 객체는 as_image/as_pil 메서드를 제공할 수 있음
-                as_image_fn = getattr(img, "as_image", None) or getattr(img, "as_pil", None)
-                if callable(as_image_fn):
-                    try:
-                        converted = as_image_fn()
-                        if isinstance(converted, PILImage.Image):
-                            normalized_prev.append(converted)
-                            continue
-                    except Exception:
-                        logger.warning("이전 생성 이미지 변환 실패 (as_image): %s", type(img))
-
-                logger.warning("지원되지 않는 이전 생성 이미지 타입 무시: %s", type(img))
-
-            parts = [*normalized_prev, *parts]
-
         # Gemini API 호출 → 텍스트 + 생성 이미지
-        logger.info("Sending parts types: %s", [type(p) for p in parts])
-        preview = []
-        for i, p in enumerate(parts):
-            try:
-                preview.append((i, type(p), isinstance(p, list), str(p)[:120]))
-            except Exception:
-                preview.append((i, type(p), isinstance(p, list), "<unprintable>"))
-        logger.info("Sending parts preview (index,type,is_list,repr): %s", preview)
         step_response: StepResponse = self._client.send(parts)
-        logger.info(
-            "Step %d 응답 수신 (텍스트: %d자, 생성 이미지: %d장)",
-            step_num, len(step_response.text), len(step_response.images),
-        )
 
         # 결과 저장
         output_file: Path | None = None
@@ -205,8 +152,8 @@ class Pipeline:
                 image_path=image_path,
                 response=step_response.text,
                 generated_images=step_response.images,
-                chat_history_before=chat_before,
             )
+            logger.info("Step %d 완료: %s", step_num, output_file or '저장 안 함')
 
         return StepResult(
             step=step_num,

@@ -12,9 +12,9 @@ from google.genai import types
 # ─────────────────────────────────────────────
 # 사용할 Gemini 모델
 # ─────────────────────────────────────────────
-# gemini-3.1-flash-image-preview: 이미지 생성/편집 지원 (Nano Banana 2)
-MODEL_NAME = "gemini-3.1-flash-image-preview"
-# 다른 옵션: "gemini-3-pro-image-preview", "gemini-2.5-flash-image"
+# gemini-3-pro-image-preview: 이미지 생성/편집 지원 (Nano Banana Pro)
+MODEL_NAME = "gemini-3-pro-image-preview"
+# 다른 옵션: "gemini-3-pro-image-preview"
 
 # ─────────────────────────────────────────────
 # 응답 모달리티 (텍스트 + 이미지 모두 요청)
@@ -58,7 +58,10 @@ CHAT_CONFIG = types.GenerateContentConfig(
     response_modalities=RESPONSE_MODALITIES,
     image_config=IMAGE_CONFIG,
     safety_settings=SAFETY_SETTINGS,
-    thinking_config=types.ThinkingConfig(thinking_budget=0),
+    # 일부 이미지-전용 모델은 `thinking_level` 파라미터를 지원하지 않습니다.
+    # 기본적으로 Gemini는 동적 사고를 사용하며(모델 기본값은 'high')
+    # 여기서는 모델 호환성을 위해 동적 사고 모드(`thinking_budget=-1`)를 사용합니다.
+    thinking_config=types.ThinkingConfig(thinking_budget=-1),
     temperature=0,
 )
 
