@@ -26,47 +26,73 @@ IMAGES_BASE = Path("images")
 PIPELINE_STEPS: list[dict] = [
     {
         "step": 1,
-        "name": "initial_analysis",
-        "description": "Step 1 - 초기 이미지 분석",
+        "name": "level_1_style_change",
+        "description": "Step 1 - 이미지 스타일 바꾸기",
         "prompt": (
-            "제공된 이미지를 주의 깊게 분석해 주세요.\n"
-            "다음 항목을 중심으로 설명하세요:\n"
-            "1. 이미지의 주요 시각적 요소와 구성\n"
-            "2. 색상 팔레트 및 명암 특성\n"
-            "3. 반복되거나 눈에 띄는 패턴 또는 구조\n"
-            "4. 전체적인 스타일 및 분위기"
+            """{
+                "persona": [
+                    "신발 개발자",
+                    "모든 파트를 디테일하게 빠짐없이 구분해야하는 상황",
+                    "2D로 설계도를 작성해야하는 상황"
+                ],
+                "task": [
+                    "모든 파트를 재봉선, 접합부 기준으로 구분"
+                ],
+                "task_rule": [
+                    "각 파트가 명확하게 구분되도록 표기",
+                    "최대한 디테일하게 모든 파트를 명확히 구분",
+                    "라벨, 글자 등 까지 모든 라인을 빠짐없이 표기",
+                    "글자 없이 신발 하나의 그림으로 구분되게 표기",
+                    "완전히 조립된 단일 신발 한짝만 표기",
+                    "색상은 전부 흰색으로 검은 선만 표기"
+                ],
+                "CAUTION": [
+                    "원본 이미지 기반하여 '빈틈 없이' 구분",
+                    "소재나 색상이 구분되는 경우는 반드시 구분"
+                ]
+            }"""
         ),
-        "image_path": IMAGES_BASE / "step1" / "input.png",
+        "image_path": IMAGES_BASE / "step1",
         "save_output": True,
     },
     {
         "step": 2,
-        "name": "lateral_pattern_extraction",
-        "description": "Step 2 - 측면 패턴 추출",
+        "name": "level_2_pattern_generation",
+        "description": "Step 2 - 이미지 펼치기",
         "prompt": (
-            "이전 분석 결과를 바탕으로, 이번 두 번째 이미지를 살펴보세요.\n"
-            "다음을 분석하세요:\n"
-            "1. 첫 번째 이미지와 공통적으로 나타나는 패턴 또는 구조\n"
-            "2. 두 이미지 간의 시각적 차이점과 전환 방식\n"
-            "3. 두 이미지를 관통하는 '측면적(lateral)' 패턴의 핵심 요소"
+            """{
+                "task": [
+                    "Upper만 3D 모양이라고 생각했을때, 2D 도면으로 로 펼쳐야해."
+                ],
+                "task_rule": [
+                    "u 자 형태로 자연스럽게 이어지도록 펼쳐줘",
+                    "vamp가 중앙에 오도록 펼쳐줘",
+                    "모든 파트가 왜곡없이 정확하게 나와야해",
+                    "모든 무늬를 비율에 맞게 펼치면서 유지해야해",
+                    "midsole, tongue, lace는 없어야해",
+                    "그림의 안은 흰색으로 채워야해",
+                    "가이드라인에 중앙에 최대한 밀착해서그려줘",
+                    "가이드라인처럼 신발 패턴이 겹쳐서 오른쪽이 위에 꼭 올라가야해",
+                    "가이드라인에 정확하게 맞게 그려줘",
+                    "**가이드라인에 최대한 밀착해서 그려줘**"
+                ]
+                "caution": [
+                    "원본 이미지 기반하여 '빈틈 없이' 구분",
+                    "소재나 색상이 구분되는 경우는 반드시 구분"
+                ],
+            }"""   
         ),
-        "image_path": IMAGES_BASE / "step2" / "input.png",
+        "image_path": IMAGES_BASE / "step2",
         "save_output": True,
     },
     {
         "step": 3,
-        "name": "final_synthesis",
-        "description": "Step 3 - 최종 패턴 합성",
+        "name": "level_3_guideline_addition",
+        "description": "Step 3 - 여분 가이드라인 추가",
         "prompt": (
-            "앞선 두 단계의 분석을 종합하여, 이 세 번째 이미지까지 포함한 "
-            "최종 패턴 합성 결과를 작성해 주세요.\n"
-            "결과물에 다음을 포함하세요:\n"
-            "1. 세 이미지를 관통하는 통합 패턴 기술\n"
-            "2. 패턴의 변화 흐름(Step 1 → Step 2 → Step 3)\n"
-            "3. 최종 도출된 핵심 패턴의 구조적 정의\n"
-            "4. 이 패턴을 활용할 수 있는 응용 방향 제안"
+            "실제 제조할때 여분을 주기위한 여분 가이드라인이야. 도면을 정확하게 가이드라인에 맞춰서 패턴을 자연스럽게 확장해줘"
         ),
-        "image_path": IMAGES_BASE / "step3" / "input.png",
+        "image_path": IMAGES_BASE / "step3",
         "save_output": True,
     },
 ]

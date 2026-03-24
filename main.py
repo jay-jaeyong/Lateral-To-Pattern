@@ -62,6 +62,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="결과를 저장할 최상위 디렉터리 (기본값: output/)",
     )
     parser.add_argument(
+        "--start-step",
+        type=int,
+        default=1,
+        help="어떤 단계부터 실행할지 지정 (기본값: 1)",
+    )
+    parser.add_argument(
         "--step1-image",
         default=None,
         help="Step 1에서 사용할 이미지 경로 (미입력 시 config/prompts.py 설정 사용)",
@@ -122,12 +128,69 @@ def main() -> None:
         3: args.step3_image,
     }
     steps = apply_image_overrides(PIPELINE_STEPS, image_overrides)
+    # 콘솔에서 시작 단계를 선택하도록 대화형으로 묻습니다 (터미널이 아닐 경우 기본값 사용)
+    try:
+        if sys.stdin.isatty():
+            import re
+
+            max_step = max(s.get("step", 0) for s in PIPELINE_STEPS)
+            print("어떤 단계부터 실행할까요? (숫자 입력, 예: 1). 가능한 단계:")
+            for s in PIPELINE_STEPS:
+                print(f"  {s['step']}: {s['description']}")
+            raw = input(f"시작 단계 (기본 1): ").strip()
+            if raw == "":
+                start_step = 1
+            else:
+                m = re.search(r"(\d+)", raw)
+                if not m:
+                    logger.error("잘못된 입력입니다. 숫자를 포함한 값을 입력하세요.")
+                    sys.exit(2)
+                start_step = int(m.group(1))
+        else:
+            start_step = 1
+    except Exception:
+        start_step = 1
+
+    max_step = max(s.get("step", 0) for s in PIPELINE_STEPS)
+    if start_step < 1 or start_step > max_step:
+        logger.error("유효하지 않은 start-step: %d (1-%d)", start_step, max_step)
+        sys.exit(2)
+
+    steps = [s for s in steps if s.get("step", 0) >= start_step]
+
+    # 실행 레이블(run_label)을 첫 단계의 입력 이미지 이름으로 설정합니다(가능한 경우).
+    def _derive_run_label(steps_list):
+        from pathlib import Path
+        from src.image_handler import ImageHandler
+
+        if not steps_list:
+            return None
+        first = steps_list[0]
+        img_path = first.get("image_path")
+        if not img_path:
+            return None
+        p = Path(img_path)
+        # 디렉터리면 내부 첫 이미지 파일명을 사용 (숨김파일 및 지원 확장자만)
+        if p.is_dir():
+            for child in sorted(p.iterdir()):
+                if child.is_file() and child.suffix.lower() in ImageHandler.SUPPORTED_EXTENSIONS:
+                    return child.stem.replace(" ", "_")
+            return None
+        # 파일이면 파일명 기반으로 레이블 생성
+        if p.is_file():
+            if p.suffix.lower() in ImageHandler.SUPPORTED_EXTENSIONS:
+                return p.stem.replace(" ", "_")
+            return None
+        return None
+
+    derived_label = _derive_run_label(steps)
+    run_label = args.run_label or derived_label
 
     # 파이프라인 실행
     pipeline = Pipeline(
         steps=steps,
         output_dir=Path(args.output_dir),
-        run_label=args.run_label,
+        run_label=run_label,
     )
 
     try:

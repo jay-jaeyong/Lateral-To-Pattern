@@ -67,6 +67,26 @@ class ImageHandler:
             Gemini API에 전달할 parts 리스트.
         """
         if image_path is not None:
-            image = ImageHandler.load(image_path)
+            path = Path(image_path)
+
+            # 디렉터리인 경우 내부의 모든 지원 이미지 파일을 로드합니다.
+            if path.is_dir():
+                images: list[Image.Image] = []
+                for child in sorted(path.iterdir()):
+                    if child.is_file() and child.suffix.lower() in ImageHandler.SUPPORTED_EXTENSIONS:
+                        try:
+                            images.append(ImageHandler.load(child))
+                        except Exception as exc:  # 로그는 남기고 다음 파일로 진행
+                            logger.warning("이미지 로드 실패: %s — %s", child, exc)
+
+                # 이미지가 하나도 없으면 프롬프트만으로 진행하도록 합니다 (채팅 컨텍스트 유지)
+                if not images:
+                    logger.info("이미지 없음: %s — 프롬프트만으로 진행합니다.", path)
+                    return [prompt]
+
+                return [*images, prompt]
+
+            # 파일인 경우 기존 동작 유지
+            image = ImageHandler.load(path)
             return [image, prompt]
         return [prompt]

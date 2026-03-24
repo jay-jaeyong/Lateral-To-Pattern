@@ -27,10 +27,7 @@ RESPONSE_MODALITIES = ["TEXT", "IMAGE"]
 # aspect_ratio: "1:1","1:4","1:8","2:3","3:2","3:4","4:1","4:3","4:5",
 #               "5:4","8:1","9:16","16:9","21:9"
 # image_size:   "512", "1K", "2K", "4K"  ← SDK 버전 업 시 IMAGE_CONFIG에 추가
-IMAGE_CONFIG = types.ImageConfig(
-    aspect_ratio="1:1",
-    # image_size="1K",  # SDK >= 2.0 이상에서 활성화 예정
-)
+IMAGE_CONFIG = None  # let the model choose image aspect ratio (auto)
 
 # ─────────────────────────────────────────────
 # 안전 설정
@@ -61,6 +58,8 @@ CHAT_CONFIG = types.GenerateContentConfig(
     response_modalities=RESPONSE_MODALITIES,
     image_config=IMAGE_CONFIG,
     safety_settings=SAFETY_SETTINGS,
+    thinking_config=types.ThinkingConfig(thinking_budget=0),
+    temperature=0,
 )
 
 # ─────────────────────────────────────────────

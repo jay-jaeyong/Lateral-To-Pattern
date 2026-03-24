@@ -18,6 +18,9 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from PIL import Image as PILImage
+
+from src.image_handler import ImageHandler
 
 logger = logging.getLogger(__name__)
 
@@ -58,24 +61,90 @@ class OutputHandler:
         image_path: Path | str | None,
         response: str,
         generated_images: list | None = None,
+        chat_history_before: list | None = None,
     ) -> Path:
         """단계별 결과를 Markdown 파일로 저장하고 생성된 이미지도 저장합니다.
 
         Returns:
             저장된 Markdown 파일의 경로.
         """
-        # 생성된 이미지 저장
+        # 단계별 하위 디렉터리 생성 (예: output/{run_label}/step1)
+        step_dir = self._run_dir / f"step{step}"
+        step_dir.mkdir(parents=True, exist_ok=True)
+
+        # 입력 이미지 정보 수집 (이름, 상대경로, 크기)
+        input_image_infos: list[dict] = []
+        if image_path:
+            p = Path(image_path)
+            if p.is_dir():
+                for child in sorted(p.iterdir()):
+                    if child.is_file() and child.suffix.lower() in ImageHandler.SUPPORTED_EXTENSIONS:
+                        try:
+                            with PILImage.open(child) as im:
+                                size = im.size
+                        except Exception:
+                            size = None
+                        input_image_infos.append({
+                            "name": child.name,
+                            "path": child.name,
+                            "size": size,
+                        })
+            elif p.is_file():
+                try:
+                    with PILImage.open(p) as im:
+                        size = im.size
+                except Exception:
+                    size = None
+                input_image_infos.append({
+                    "name": p.name,
+                    "path": p.name,
+                    "size": size,
+                })
+
+        # 생성된 이미지 저장 (단계별 폴더에 저장) 및 정보 수집
         saved_image_paths: list[Path] = []
+        generated_image_infos: list[dict] = []
         for idx, img in enumerate(generated_images or [], start=1):
-            img_filename = f"step_{step:02d}_{name}_generated_{idx:02d}.png"
-            img_path = self._run_dir / img_filename
+            # 가능한 경우 입력 이미지명으로 생성 이미지 파일명을 정해 덮어쓰기 가능하게 합니다.
+            if input_image_infos:
+                # 대응되는 입력 이미지가 있으면 그 이름을 사용
+                if len(input_image_infos) >= idx:
+                    base_name = Path(input_image_infos[idx - 1]["name"]).stem
+                else:
+                    # 입력이 하나뿐이면 모두 그 이름으로 덮어쓰기
+                    base_name = Path(input_image_infos[0]["name"]).stem
+                img_filename = f"{base_name}.png"
+            else:
+                img_filename = f"generated_{idx:02d}.png"
+            img_path = step_dir / img_filename
             img.save(img_path)
             saved_image_paths.append(img_path)
+            try:
+                size = getattr(img, "size", None)
+            except Exception:
+                size = None
+            generated_image_infos.append({
+                "name": img_filename,
+                "path": img_path.name,
+                "size": size,
+            })
             logger.info("Step %d 생성 이미지 저장: %s", step, img_path)
 
-        # Markdown 저장
+        # Markdown 저장 (단계별 폴더에 저장)
         filename = f"step_{step:02d}_{name}.md"
-        file_path = self._run_dir / filename
+        file_path = step_dir / filename
+
+        # 누적 채팅 히스토리(단계 시작 전)를 간단한 텍스트로 요약
+        accumulated_text = ""
+        if chat_history_before:
+            serialized = self._serialize_history(chat_history_before)
+            parts: list[str] = []
+            for turn in serialized:
+                role = turn.get("role", "unknown")
+                texts = [p["content"] for p in turn.get("parts", []) if p.get("type") == "text"]
+                if texts:
+                    parts.append(f"- {role}: {' '.join(texts)}")
+            accumulated_text = "\n".join(parts)
 
         content = self._format_step_markdown(
             step=step,
@@ -83,7 +152,11 @@ class OutputHandler:
             prompt=prompt,
             image_path=image_path,
             response=response,
-            saved_image_paths=saved_image_paths,
+            input_images=input_image_infos,
+            generated_images=generated_image_infos,
+            step_dir=step_dir.name,
+            run_label=self._run_label,
+            accumulated_context=accumulated_text,
         )
 
         file_path.write_text(content, encoding="utf-8")
@@ -136,33 +209,75 @@ class OutputHandler:
         prompt: str,
         image_path: Path | str | None,
         response: str,
-        saved_image_paths: list | None = None,
+        input_images: list[dict] | None = None,
+        generated_images: list[dict] | None = None,
+        step_dir: str | None = None,
+        run_label: str | None = None,
+        accumulated_context: str | None = None,
     ) -> str:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         image_str = str(image_path) if image_path else "없음"
 
-        # 생성된 이미지 링크 목록
-        if saved_image_paths:
-            img_links = "\n".join(
-                f"- ![생성이미지_{i}]({p.name})" for i, p in enumerate(saved_image_paths, 1)
-            )
-            generated_section = f"\n**생성된 이미지:**\n\n{img_links}\n"
+        # 입력 이미지 섹션
+        if input_images:
+            input_lines = []
+            for info in input_images:
+                size_str = f" ({info['size'][0]}x{info['size'][1]})" if info.get("size") else ""
+                input_lines.append(f"- {info['name']}{size_str}")
+            input_section = "\n".join(input_lines)
         else:
-            generated_section = "\n**생성된 이미지:** 없음\n"
+            input_section = "없음"
+
+        # 생성된 이미지 링크 및 정보
+        if generated_images:
+            gen_lines = []
+            for i, info in enumerate(generated_images, 1):
+                size = info.get("size")
+                size_str = f" ({size[0]}x{size[1]})" if size else ""
+                gen_lines.append(f"- ![generated_{i}]({info['path']}) {info['name']}{size_str}")
+            generated_section = "\n".join(gen_lines)
+        else:
+            generated_section = "없음"
+
+        metadata = f"Run: {run_label or 'unknown'} | Step dir: {step_dir or 'N/A'}"
+
+        # 누적 컨텍스트(단계 시작 전에 Gemini가 가진 정보)
+        acc_section = accumulated_context or "(없음)"
 
         return (
-            f"# Step {step}: {description}\n\n"
-            f"> 생성 시각: {timestamp}\n\n"
-            f"---\n\n"
-            f"## 입력\n\n"
-            f"**입력 이미지 경로:** `{image_str}`\n\n"
-            f"**프롬프트:**\n\n"
-            f"```\n{prompt}\n```\n\n"
-            f"---\n\n"
-            f"## Gemini 응답\n\n"
-            f"### 텍스트\n\n"
-            f"{response}\n"
-            f"{generated_section}"
+            "# Step "
+            + str(step)
+            + ": "
+            + description
+            + "\n\n"
+            + "> 생성 시각: "
+            + timestamp
+            + "\n\n"
+            + "---\n\n"
+            + "**메타데이터:** "
+            + metadata
+            + "\n\n"
+            + "## 입력 이미지\n\n"
+            + input_section
+            + "\n\n"
+            + "---\n\n"
+            + "## 프롬프트\n\n"
+            + "```\n"
+            + prompt
+            + "\n```\n\n"
+            + "---\n\n"
+            + "## 누적 컨텍스트 (단계 시작 전)\n\n"
+            + acc_section
+            + "\n\n"
+            + "---\n\n"
+            + "## Gemini 응답\n\n"
+            + "### 텍스트\n\n"
+            + response
+            + "\n\n"
+            + "---\n\n"
+            + "## 생성된 이미지\n\n"
+            + generated_section
+            + "\n"
         )
 
     @staticmethod
