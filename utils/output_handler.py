@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -64,17 +65,21 @@ class OutputHandler:
         Returns:
             저장된 Markdown 파일의 경로.
         """
-        # 생성된 이미지 저장
+        # 생성된 이미지 저장 (파일명 안전화 및 예외 처리)
         saved_image_paths: list[Path] = []
+        safe_name = self._sanitize_filename(name)
         for idx, img in enumerate(generated_images or [], start=1):
-            img_filename = f"step_{step:02d}_{name}_generated_{idx:02d}.png"
+            img_filename = f"step_{step:02d}_{safe_name}_generated_{idx:02d}.png"
             img_path = self._run_dir / img_filename
-            img.save(img_path)
-            saved_image_paths.append(img_path)
-            logger.info("Step %d 생성 이미지 저장: %s", step, img_path)
+            try:
+                img.save(img_path)
+                saved_image_paths.append(img_path)
+                logger.info("Step %d 생성 이미지 저장: %s", step, img_path)
+            except Exception:
+                logger.exception("이미지 저장 실패: %s", img_path)
 
         # Markdown 저장
-        filename = f"step_{step:02d}_{name}.md"
+        filename = f"step_{step:02d}_{safe_name}.md"
         file_path = self._run_dir / filename
 
         content = self._format_step_markdown(
@@ -86,8 +91,11 @@ class OutputHandler:
             saved_image_paths=saved_image_paths,
         )
 
-        file_path.write_text(content, encoding="utf-8")
-        logger.info("Step %d 결과 저장: %s", step, file_path)
+        try:
+            file_path.write_text(content, encoding="utf-8")
+            logger.info("Step %d 결과 저장: %s", step, file_path)
+        except Exception:
+            logger.exception("Markdown 파일 저장 실패: %s", file_path)
         return file_path
 
     # ──────────────────────────────────────────────────
@@ -100,28 +108,37 @@ class OutputHandler:
         Returns:
             저장된 파일의 경로.
         """
-        # 최종 생성 이미지 저장
+        # 최종 생성 이미지 저장 (예외 처리)
         for idx, img in enumerate(generated_images or [], start=1):
             img_path = self._run_dir / f"final_generated_{idx:02d}.png"
-            img.save(img_path)
-            logger.info("최종 생성 이미지 저장: %s", img_path)
+            try:
+                img.save(img_path)
+                logger.info("최종 생성 이미지 저장: %s", img_path)
+            except Exception:
+                logger.exception("최종 이미지 저장 실패: %s", img_path)
 
         # 최종 응답 Markdown
         final_md_path = self._run_dir / "final_output.md"
-        final_md_path.write_text(
-            self._format_final_markdown(text),
-            encoding="utf-8",
-        )
-        logger.info("최종 결과 저장: %s", final_md_path)
+        try:
+            final_md_path.write_text(
+                self._format_final_markdown(text),
+                encoding="utf-8",
+            )
+            logger.info("최종 결과 저장: %s", final_md_path)
+        except Exception:
+            logger.exception("최종 Markdown 파일 저장 실패: %s", final_md_path)
 
         # 채팅 히스토리 JSON
         history_path = self._run_dir / "chat_history.json"
         history_data = self._serialize_history(chat_history or [])
-        history_path.write_text(
-            json.dumps(history_data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        logger.info("채팅 히스토리 저장: %s", history_path)
+        try:
+            history_path.write_text(
+                json.dumps(history_data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            logger.info("채팅 히스토리 저장: %s", history_path)
+        except Exception:
+            logger.exception("채팅 히스토리 저장 실패: %s", history_path)
 
         return final_md_path
 
@@ -193,3 +210,18 @@ class OutputHandler:
                     parts_data.append({"type": "unknown", "content": str(part)})
             serialized.append({"role": turn.role, "parts": parts_data})
         return serialized
+
+    @staticmethod
+    def _sanitize_filename(value: str) -> str:
+        """파일명으로 안전하게 변환합니다: 위험 문자 제거, 연속 구분자 축소."""
+        if not value:
+            return "untitled"
+        # 위험한 문자들을 '_'로 대체
+        s = re.sub(r'[\\/*?<>|:"\n\r]+', "_", value)
+        # 공백을 언더스코어로
+        s = re.sub(r"\s+", "_", s)
+        # 여러 '_' 연속을 하나로
+        s = re.sub(r"_+", "_", s)
+        # 앞뒤 '_' 제거 및 길이 제한
+        s = s.strip("_")[:100]
+        return s or "untitled"

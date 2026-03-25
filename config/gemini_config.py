@@ -61,7 +61,7 @@ CHAT_CONFIG = types.GenerateContentConfig(
     # 일부 이미지-전용 모델은 `thinking_level` 파라미터를 지원하지 않습니다.
     # 기본적으로 Gemini는 동적 사고를 사용하며(모델 기본값은 'high')
     # 여기서는 모델 호환성을 위해 동적 사고 모드(`thinking_budget=-1`)를 사용합니다.
-    thinking_config=types.ThinkingConfig(thinking_budget=-1),
+    # thinking_config=types.ThinkingConfig(thinking_budget=types.ThinkingLevel.HIGH),
     temperature=0,
 )
 
