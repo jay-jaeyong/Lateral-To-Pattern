@@ -21,6 +21,8 @@ env/
 
 # 출력 결과 (선택적으로 추적 제외)
 output/
+# 이미지 생성 폴더
+images/
 
 # IDE
 .vscode/settings.json
