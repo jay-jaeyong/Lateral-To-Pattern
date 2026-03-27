@@ -17,6 +17,7 @@ from pathlib import Path
 
 from PIL import Image as PILImage
 from google import genai
+from google.genai import types as genai_types
 
 from config.api_config import get_api_key
 from config.gemini_config import (
@@ -93,17 +94,83 @@ class GeminiClient:
                 "채팅 세션이 시작되지 않았습니다. start_chat()을 먼저 호출하세요."
             )
 
+        # 안전: parts에 중첩된 리스트가 있으면 평탄화합니다.
+        try:
+            parts = self._flatten_parts(parts)
+        except Exception:
+            logger.debug("parts 평탄화 중 오류 발생 — 원본을 그대로 사용합니다.")
+
+        # 추가 안전 검사: 중첩된 리스트/튜플이 남아 있으면 재평탄화
+        try:
+            while any(isinstance(p, (list, tuple)) for p in parts):
+                parts = self._flatten_parts(parts)
+        except Exception:
+            logger.debug("parts 추가 평탄화 중 오류 발생")
+
+        # 허용되지 않는 파트 타입이 있으면 문자열로 변환해 보냅니다.
+        sanitized: list = []
+        for idx, p in enumerate(parts):
+            # 허용되는 기본 타입: str, PIL.Image, genai File/Part, dict-like PartDict
+            if isinstance(p, str) or isinstance(p, PILImage.Image):
+                sanitized.append(p)
+                continue
+            # genai types: File, Part (실제 클래스만 isinstance 체크, TypedDict 제외)
+            allowed_classes = tuple(
+                t for t in (
+                    getattr(genai_types, "File", None),
+                    getattr(genai_types, "Part", None),
+                )
+                if t is not None and isinstance(t, type)
+            )
+            if allowed_classes and isinstance(p, allowed_classes):
+                sanitized.append(p)
+                continue
+            # dict-like (PartDict / FileDict 는 TypedDict이므로 dict로만 판별)
+            if isinstance(p, dict):
+                sanitized.append(p)
+                continue
+            # 마지막 수단: repr로 변환
+            logger.info("허용되지 않는 파트 타입 발견(%s) — repr으로 변환하여 전송합니다.", type(p))
+            sanitized.append(repr(p)[:1000])
+
+        parts = sanitized
+
+        # Debug: log the outgoing parts and current chat history (if logger is set to DEBUG)
+        try:
+            logger.debug("=== Gemini API Request Parts ===\n%s", self._format_parts_for_log(parts))
+        except Exception:
+            logger.debug("=== Gemini API Request Parts: <failed to format parts> ===")
+
+        try:
+            logger.debug("=== Chat history BEFORE send ===\n%s", self._format_chat_history_for_log())
+        except Exception:
+            logger.debug("=== Chat history BEFORE send: <failed to format history> ===")
+
         last_error: Exception | None = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 logger.debug("API 호출 시도 %d/%d", attempt, MAX_RETRIES)
                 response = self._chat.send_message(parts)
                 result = self._parse_response(response)
+
                 logger.debug(
                     "API 응답 수신 완료 (텍스트: %d자, 이미지: %d장)",
                     len(result.text),
                     len(result.images),
                 )
+
+                # Debug: log a concise response preview and updated history
+                try:
+                    preview = result.text.replace("\n", " ")[:400]
+                    logger.debug("=== Gemini API Response Preview ===\nlen=%d images=%d preview=%s", len(result.text), len(result.images), preview)
+                except Exception:
+                    logger.debug("=== Gemini API Response Preview: <failed to format> ===")
+
+                try:
+                    logger.debug("=== Chat history AFTER send ===\n%s", self._format_chat_history_for_log())
+                except Exception:
+                    logger.debug("=== Chat history AFTER send: <failed to format history> ===")
+
                 return result
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
@@ -143,3 +210,81 @@ class GeminiClient:
             text="\n".join(text_parts).strip(),
             images=images,
         )
+
+    # ──────────────────────────────────────────────────────────────────
+    # Debug helpers
+    # ──────────────────────────────────────────────────────────────────
+
+    def _format_parts_for_log(self, parts: list) -> str:
+        """Return a human-friendly summary of the `parts` list for logging."""
+        lines: list[str] = []
+        for idx, part in enumerate(parts):
+            try:
+                # PIL Image
+                if isinstance(part, PILImage.Image):
+                    filename = getattr(part, "filename", None)
+                    size = getattr(part, "size", None)
+                    mode = getattr(part, "mode", None)
+                    lines.append(
+                        f"part[{idx}]: Image filename={filename!r} size={size} mode={mode}"
+                    )
+                # Plain text prompt
+                elif isinstance(part, str):
+                    preview = " ".join(part.splitlines())[:200]
+                    lines.append(f"part[{idx}]: Text(len={len(part)}) preview={preview!r}")
+                else:
+                    lines.append(f"part[{idx}]: {type(part).__name__} repr={repr(part)[:200]}")
+            except Exception:
+                lines.append(f"part[{idx}]: <failed to inspect part of type {type(part).__name__}>")
+        return "\n".join(lines) if lines else "<no parts>"
+
+    def _format_chat_history_for_log(self) -> str:
+        """Serialize the current chat history into a compact, human-readable string."""
+        history = self.chat_history
+        if not history:
+            return "<empty chat history>"
+
+        out_lines: list[str] = []
+        for i, turn in enumerate(history):
+            role = getattr(turn, "role", "unknown")
+            part_summaries: list[str] = []
+            for p in getattr(turn, "parts", []):
+                try:
+                    if getattr(p, "text", None):
+                        txt = p.text
+                        snippet = " ".join(txt.splitlines())[:200]
+                        part_summaries.append(f"TEXT(len={len(txt)}): {snippet!r}")
+                    elif getattr(p, "inline_data", None):
+                        mime = getattr(p.inline_data, "mime_type", "unknown")
+                        part_summaries.append(f"IMAGE(inline mime={mime})")
+                    else:
+                        part_summaries.append(type(p).__name__)
+                except Exception:
+                    part_summaries.append("<failed to inspect part>")
+            out_lines.append(f"turn[{i}] role={role} parts=[{', '.join(part_summaries)}]")
+        return "\n".join(out_lines)
+
+    def _flatten_parts(self, parts: list) -> list:
+        """Recursively flatten lists/tuples inside parts but keep strings and image objects intact.
+
+        The SDK expects a flat list of parts (or a single part). If callers accidentally
+        pass nested lists (e.g. lists of images), flatten them so each element is an
+        allowed part type.
+        """
+        flat: list = []
+
+        def _rec(item):
+            # strings are single parts
+            if isinstance(item, str):
+                flat.append(item)
+                return
+            # tuples/lists should be flattened
+            if isinstance(item, (list, tuple)):
+                for sub in item:
+                    _rec(sub)
+                return
+            # otherwise append as-is (PIL images or genai File/Part objects)
+            flat.append(item)
+
+        _rec(parts)
+        return flat

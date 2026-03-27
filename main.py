@@ -27,6 +27,7 @@ from pathlib import Path
 
 from src.pipeline import Pipeline
 from config.prompts import PIPELINE_STEPS
+from src.logging_utils import StepFilter
 
 
 # ─────────────────────────────────────────────
@@ -35,12 +36,20 @@ from config.prompts import PIPELINE_STEPS
 
 def setup_logging(verbose: bool = False) -> None:
     level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    formatter = logging.Formatter(
+        fmt="%(asctime)s [%(levelname)s%(step_label)s] %(name)s - %(message)s",
         datefmt="%H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
     )
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+    handler.addFilter(StepFilter())
+    logging.basicConfig(level=level, handlers=[handler])
+    # Suppress noisy external libraries at INFO level unless verbose mode requested
+    if not verbose:
+        logging.getLogger("google_genai").setLevel(logging.WARNING)
+        logging.getLogger("google_genai.models").setLevel(logging.WARNING)
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
 # ─────────────────────────────────────────────

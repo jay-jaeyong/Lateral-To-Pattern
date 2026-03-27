@@ -19,6 +19,7 @@ from config.prompts import PIPELINE_STEPS
 from src.gemini_client import GeminiClient, StepResponse
 from src.image_handler import ImageHandler
 from utils.output_handler import OutputHandler
+from src.logging_utils import step_context
 
 logger = logging.getLogger(__name__)
 
@@ -104,10 +105,17 @@ class Pipeline:
         self._client.start_chat()
 
         pipeline_result = PipelineResult()
+        # 누적된 이전 단계의 텍스트 응답 및 생성 이미지를 보관합니다
+        previous_texts: list[str] = []
+        previous_images: list = []
 
         for step_config in self._steps:
-            step_result = self._run_step(step_config)
+            step_result = self._run_step(step_config, previous_texts, previous_images)
             pipeline_result.steps.append(step_result)
+            if step_result.response:
+                previous_texts.append(step_result.response)
+            if step_result.generated_images:
+                previous_images.extend(step_result.generated_images)
 
         # 최종 결과 저장
         last = pipeline_result.steps[-1] if pipeline_result.steps else None
@@ -124,7 +132,7 @@ class Pipeline:
     # 단계 실행
     # ──────────────────────────────────────────────────
 
-    def _run_step(self, config: dict) -> StepResult:
+    def _run_step(self, config: dict, previous_texts: list[str] | None = None, previous_images: list | None = None) -> StepResult:
         """단일 파이프라인 단계를 실행합니다."""
         step_num = config["step"]
         name = config["name"]
@@ -133,27 +141,72 @@ class Pipeline:
         image_path = config.get("image_path")
         should_save = config.get("save_output", True)
 
-        logger.info("─── Step %d: %s ───", step_num, description)
+        with step_context(step_num):
+            logger.info("─── Step %d: %s ───", step_num, description)
 
-        # 이미지 + 프롬프트 → parts 구성
-        parts = ImageHandler.build_parts(prompt, image_path)
+            # 이미지 + 프롬프트 → parts 구성
+            parts = ImageHandler.build_parts(prompt, image_path)
 
-        # Gemini API 호출 → 텍스트 + 생성 이미지
-        step_response: StepResponse = self._client.send(parts)
+            # 이전 단계에서 생성된 이미지가 있으면 parts 앞에 포함시킵니다.
+            if previous_images:
+                try:
+                    parts = [*previous_images, *parts]
+                    logger.info("이전 단계 생성 이미지(%d개)를 현재 요청에 포함했습니다.", len(previous_images))
+                except Exception:
+                    logger.info("이전 단계 생성 이미지를 요청에 포함하지 못했습니다.")
 
-        # 결과 저장
-        output_file: Path | None = None
-        if should_save:
-            output_file = self._output_handler.save_step(
-                step=step_num,
-                name=name,
-                description=description,
-                prompt=prompt,
-                image_path=image_path,
-                response=step_response.text,
-                generated_images=step_response.images,
-            )
-            logger.info("Step %d 완료: %s", step_num, output_file or '저장 안 함')
+            # 이전 단계의 응답 텍스트가 있으면 parts에 포함시킵니다.
+            if previous_texts:
+                try:
+                    prev_combined = "\n\n".join(
+                        f"[Previous Step {i+1} Output]\n{txt}" for i, txt in enumerate(previous_texts) if txt
+                    )
+                    if parts and isinstance(parts[-1], str):
+                        parts.insert(len(parts) - 1, prev_combined)
+                    else:
+                        parts.append(prev_combined)
+                    logger.info("이전 단계 출력(%d개)을 현재 요청에 포함했습니다.", len(previous_texts))
+                except Exception:
+                    logger.info("이전 단계 출력을 요청에 포함하지 못했습니다.")
+
+            # INFO-level: 실제로 API에 전달되는 `parts`와 현재 채팅 히스토리를 구분선으로 보기 좋게 출력합니다.
+            sep = "\n" + ("─" * 60)
+            try:
+                logger.info(
+                    "%s\n[ API REQUEST PARTS ]\n\n%s\n%s",
+                    sep,
+                    self._client._format_parts_for_log(parts),
+                    sep,
+                )
+            except Exception:
+                logger.info("%s\n[ API REQUEST PARTS ]\n<failed to format parts>\n%s", sep, sep)
+
+            try:
+                logger.info(
+                    "%s\n[ CHAT HISTORY BEFORE SEND ]\n\n%s\n%s",
+                    sep,
+                    self._client._format_chat_history_for_log(),
+                    sep,
+                )
+            except Exception:
+                logger.info("%s\n[ CHAT HISTORY BEFORE SEND ]\n<failed to format history>\n%s", sep, sep)
+
+            # Gemini API 호출 → 텍스트 + 생성 이미지
+            step_response: StepResponse = self._client.send(parts)
+
+            # 결과 저장
+            output_file: Path | None = None
+            if should_save:
+                output_file = self._output_handler.save_step(
+                    step=step_num,
+                    name=name,
+                    description=description,
+                    prompt=prompt,
+                    image_path=image_path,
+                    response=step_response.text,
+                    generated_images=step_response.images,
+                )
+                logger.info("Step %d 완료: %s", step_num, output_file or '저장 안 함')
 
         return StepResult(
             step=step_num,
