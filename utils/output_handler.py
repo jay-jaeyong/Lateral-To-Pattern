@@ -38,12 +38,15 @@ class OutputHandler:
         """
         self._run_label = run_label or datetime.now().strftime("%Y%m%d_%H%M%S")
         self._run_dir = output_dir / self._run_label
-        self._run_dir.mkdir(parents=True, exist_ok=True)
-        logger.info("출력 디렉터리 생성: %s", self._run_dir)
+        # run dir is created lazily to allow image selection and other setup
+        # to happen before filesystem side-effects. Actual directory creation
+        # and logging occurs in `_ensure_run_dir()` when saving.
+        self._run_dir_created = False
 
     @property
     def run_dir(self) -> Path:
         """현재 실행의 출력 디렉터리 경로."""
+        self._ensure_run_dir()
         return self._run_dir
 
     # ──────────────────────────────────────────────────
@@ -65,6 +68,9 @@ class OutputHandler:
         Returns:
             저장된 Markdown 파일의 경로.
         """
+        # Ensure output directory exists before writing files
+        self._ensure_run_dir()
+
         # 생성된 이미지 저장 (파일명 안전화 및 예외 처리)
         saved_image_paths: list[Path] = []
         safe_name = self._sanitize_filename(name)
@@ -108,6 +114,9 @@ class OutputHandler:
         Returns:
             저장된 파일의 경로.
         """
+        # Ensure output directory exists before writing files
+        self._ensure_run_dir()
+
         # 최종 생성 이미지 저장 (예외 처리)
         for idx, img in enumerate(generated_images or [], start=1):
             img_path = self._run_dir / f"final_generated_{idx:02d}.png"
@@ -141,6 +150,19 @@ class OutputHandler:
             logger.exception("채팅 히스토리 저장 실패: %s", history_path)
 
         return final_md_path
+
+    def _ensure_run_dir(self) -> None:
+        """Create the run directory if it doesn't exist and log creation once."""
+        if getattr(self, "_run_dir_created", False):
+            return
+        try:
+            if not self._run_dir.exists():
+                self._run_dir.mkdir(parents=True, exist_ok=True)
+                logger.info("출력 디렉터리 생성: %s", self._run_dir)
+        except Exception:
+            logger.exception("출력 디렉터리 생성 실패: %s", self._run_dir)
+        finally:
+            self._run_dir_created = True
 
     # ──────────────────────────────────────────────────
     # 포맷터

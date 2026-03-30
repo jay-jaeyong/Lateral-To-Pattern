@@ -239,29 +239,106 @@ class GeminiClient:
         return "\n".join(lines) if lines else "<no parts>"
 
     def _format_chat_history_for_log(self) -> str:
-        """Serialize the current chat history into a compact, human-readable string."""
+        """Render the current chat history in a compact chat-like UI style.
+
+        Produces lines like:
+        [18:49] You: Hello from the Left!
+        [18:49] Peer: It works!
+
+        Adds optional ANSI colors when stdout is a TTY.
+        """
         history = self.chat_history
         if not history:
             return "<empty chat history>"
 
+        import sys
+        import datetime
+
+        use_color = sys.stdout.isatty()
+
+        # ANSI color codes (used only when a TTY is detected)
+        RESET = "\x1b[0m"
+        DIM = "\x1b[2m"
+        GREEN = "\x1b[32m"
+        CYAN = "\x1b[36m"
+        MAGENTA = "\x1b[35m"
+        GREY = "\x1b[90m"
+
+        def colorize(text: str, code: str) -> str:
+            return f"{code}{text}{RESET}" if use_color else text
+
+        def _fmt_ts(ts) -> str:
+            if not ts:
+                return ""
+            try:
+                if hasattr(ts, "ToDatetime"):
+                    dt = ts.ToDatetime()
+                elif isinstance(ts, datetime.datetime):
+                    dt = ts
+                elif isinstance(ts, (int, float)):
+                    dt = datetime.datetime.fromtimestamp(ts)
+                else:
+                    # Fallback to str
+                    return str(ts)
+                return dt.strftime("%H:%M")
+            except Exception:
+                return str(ts)
+
+        label_map = {"user": "You", "assistant": "Peer", "system": "System"}
+
         out_lines: list[str] = []
-        for i, turn in enumerate(history):
+
+        for turn in history:
             role = getattr(turn, "role", "unknown")
-            part_summaries: list[str] = []
+            role_key = str(role).lower()
+            label = label_map.get(role_key, str(role))
+
+            ts = getattr(turn, "create_time", None) or getattr(turn, "timestamp", None) or getattr(turn, "time", None)
+            ts_short = _fmt_ts(ts)
+            ts_display = f"[{ts_short}]" if ts_short else ""
+
+            # choose color for role
+            if role_key == "user":
+                role_color = GREEN
+            elif role_key == "assistant":
+                role_color = CYAN
+            elif role_key == "system":
+                role_color = MAGENTA
+            else:
+                role_color = GREY
+
             for p in getattr(turn, "parts", []):
                 try:
                     if getattr(p, "text", None):
-                        txt = p.text
-                        snippet = " ".join(txt.splitlines())[:200]
-                        part_summaries.append(f"TEXT(len={len(txt)}): {snippet!r}")
+                        text = p.text.rstrip("\n")
+                        if not text:
+                            continue
+                        # Split into lines; first line prints header, rest are indented
+                        lines = text.splitlines()
+                        first = lines[0]
+                        if use_color:
+                            ts_col = colorize(ts_display, DIM) + " " if ts_display else ""
+                            role_col = colorize(label, role_color)
+                            out_lines.append(f"{ts_col}{role_col}: {first}")
+                        else:
+                            prefix = f"{ts_display + ' ' if ts_display else ''}{label}:"
+                            out_lines.append(f"{prefix} {first}")
+                        for cont in lines[1:]:
+                            out_lines.append("    " + cont)
                     elif getattr(p, "inline_data", None):
                         mime = getattr(p.inline_data, "mime_type", "unknown")
-                        part_summaries.append(f"IMAGE(inline mime={mime})")
+                        if use_color:
+                            ts_col = colorize(ts_display, DIM) + " " if ts_display else ""
+                            role_col = colorize(label, role_color)
+                            out_lines.append(f"{ts_col}{role_col}: [Image mime={mime}]")
+                        else:
+                            out_lines.append(f"{ts_display + ' ' if ts_display else ''}{label}: [Image mime={mime}]")
                     else:
-                        part_summaries.append(type(p).__name__)
+                        r = repr(p)
+                        out_lines.append(f"{ts_display + ' ' if ts_display else ''}{label}: [{type(p).__name__}] {r[:300]}")
                 except Exception:
-                    part_summaries.append("<failed to inspect part>")
-            out_lines.append(f"turn[{i}] role={role} parts=[{', '.join(part_summaries)}]")
+                    out_lines.append(f"{label}: <failed to render part>")
+
         return "\n".join(out_lines)
 
     def _flatten_parts(self, parts: list) -> list:

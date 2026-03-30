@@ -138,27 +138,8 @@ def main() -> None:
     }
     steps = apply_image_overrides(PIPELINE_STEPS, image_overrides)
     # 콘솔에서 시작 단계를 선택하도록 대화형으로 묻습니다 (터미널이 아닐 경우 기본값 사용)
-    try:
-        if sys.stdin.isatty():
-            import re
-
-            max_step = max(s.get("step", 0) for s in PIPELINE_STEPS)
-            print("어떤 단계부터 실행할까요? (숫자 입력, 예: 1). 가능한 단계:")
-            for s in PIPELINE_STEPS:
-                print(f"  {s['step']}: {s['description']}")
-            raw = input(f"시작 단계 (기본 1): ").strip()
-            if raw == "":
-                start_step = 1
-            else:
-                m = re.search(r"(\d+)", raw)
-                if not m:
-                    logger.error("잘못된 입력입니다. 숫자를 포함한 값을 입력하세요.")
-                    sys.exit(2)
-                start_step = int(m.group(1))
-        else:
-            start_step = 1
-    except Exception:
-        start_step = 1
+    # Non-interactive: use CLI argument only. Remove interactive prompt.
+    start_step = args.start_step
 
     max_step = max(s.get("step", 0) for s in PIPELINE_STEPS)
     if start_step < 1 or start_step > max_step:
@@ -192,8 +173,9 @@ def main() -> None:
             return None
         return None
 
-    derived_label = _derive_run_label(steps)
-    run_label = args.run_label or derived_label
+    # If the user provided an explicit run label, use it; otherwise we allow
+    # the Pipeline to set the label based on the selected image later.
+    run_label = args.run_label
 
     # 파이프라인 실행
     pipeline = Pipeline(

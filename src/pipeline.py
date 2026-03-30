@@ -90,6 +90,8 @@ class Pipeline:
             output_dir=Path(output_dir),
             run_label=run_label,
         )
+        # 사용자가 명시적으로 run_label을 제공했는지 여부를 보관합니다.
+        self._run_label_forced = run_label is not None
 
     # ──────────────────────────────────────────────────
     # 실행
@@ -148,7 +150,8 @@ class Pipeline:
             parts = ImageHandler.build_parts(prompt, image_path)
 
             # 이전 단계에서 생성된 이미지가 있으면 parts 앞에 포함시킵니다.
-            if previous_images:
+            # 단, 2단계에서는 이전 단계 결과물을 포함하지 않음
+            if previous_images and step_num != 2:
                 try:
                     parts = [*previous_images, *parts]
                     logger.info("이전 단계 생성 이미지(%d개)를 현재 요청에 포함했습니다.", len(previous_images))
@@ -156,7 +159,8 @@ class Pipeline:
                     logger.info("이전 단계 생성 이미지를 요청에 포함하지 못했습니다.")
 
             # 이전 단계의 응답 텍스트가 있으면 parts에 포함시킵니다.
-            if previous_texts:
+            # 단, 2단계에서는 이전 단계 결과물을 포함하지 않음
+            if previous_texts and step_num != 2:
                 try:
                     prev_combined = "\n\n".join(
                         f"[Previous Step {i+1} Output]\n{txt}" for i, txt in enumerate(previous_texts) if txt
@@ -168,6 +172,19 @@ class Pipeline:
                     logger.info("이전 단계 출력(%d개)을 현재 요청에 포함했습니다.", len(previous_texts))
                 except Exception:
                     logger.info("이전 단계 출력을 요청에 포함하지 못했습니다.")
+
+            # 이미지 선택이 발생했고, 사용자가 run_label을 명시하지 않았다면
+            # 출력 레이블을 선택한 이미지 이름으로 설정합니다 (실제 디렉터리 생성 전).
+            try:
+                selected_files = getattr(ImageHandler, "_last_selected_files", None)
+                if selected_files and not self._run_label_forced and not self._output_handler._run_dir_created:
+                    new_label = self._output_handler._sanitize_filename(selected_files[0].stem)
+                    base_dir = self._output_handler._run_dir.parent
+                    self._output_handler._run_label = new_label
+                    self._output_handler._run_dir = base_dir / new_label
+                    logger.info("출력 디렉터리 레이블을 선택한 이미지로 설정: %s", new_label)
+            except Exception:
+                logger.exception("선택 이미지로 출력 레이블을 설정하는 중 오류 발생")
 
             # INFO-level: 실제로 API에 전달되는 `parts`와 현재 채팅 히스토리를 구분선으로 보기 좋게 출력합니다.
             sep = "\n" + ("─" * 60)
