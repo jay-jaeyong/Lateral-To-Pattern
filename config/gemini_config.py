@@ -14,7 +14,6 @@ from google.genai import types
 # ─────────────────────────────────────────────
 # gemini-3-pro-image-preview: 이미지 생성/편집 지원 (Nano Banana Pro)
 MODEL_NAME = "gemini-3-pro-image-preview"
-# 다른 옵션: "gemini-3-pro-image-preview"
 
 # ─────────────────────────────────────────────
 # 응답 모달리티 (텍스트 + 이미지 모두 요청)
@@ -22,12 +21,14 @@ MODEL_NAME = "gemini-3-pro-image-preview"
 RESPONSE_MODALITIES = ["TEXT", "IMAGE"]
 
 # ─────────────────────────────────────────────
-# 출력 이미지 설정
+# 출력 이미지 설정 (4K 해상도 + 자동 비율 적용)
 # ─────────────────────────────────────────────
-# aspect_ratio: "1:1","1:4","1:8","2:3","3:2","3:4","4:1","4:3","4:5",
-#               "5:4","8:1","9:16","16:9","21:9"
-# image_size:   "512", "1K", "2K", "4K"  ← SDK 버전 업 시 IMAGE_CONFIG에 추가
-IMAGE_CONFIG = None  # let the model choose image aspect ratio (auto)
+# image_size: "512", "1K", "2K", "4K" 중 선택 가능
+# aspect_ratio를 설정하지 않으면 모델이 최적의 비율을 자동으로 선택합니다.
+IMAGE_CONFIG = types.ImageConfig(
+    image_size="4K",
+    aspect_ratio=None  # 또는 아예 이 라인을 삭제해도 무방합니다.
+)
 
 # ─────────────────────────────────────────────
 # 안전 설정
@@ -58,10 +59,6 @@ CHAT_CONFIG = types.GenerateContentConfig(
     response_modalities=RESPONSE_MODALITIES,
     image_config=IMAGE_CONFIG,
     safety_settings=SAFETY_SETTINGS,
-    # 일부 이미지-전용 모델은 `thinking_level` 파라미터를 지원하지 않습니다.
-    # 기본적으로 Gemini는 동적 사고를 사용하며(모델 기본값은 'high')
-    # 여기서는 모델 호환성을 위해 동적 사고 모드(`thinking_budget=-1`)를 사용합니다.
-    # thinking_config=types.ThinkingConfig(thinking_budget=types.ThinkingLevel.HIGH),
     temperature=0,
 )
 
