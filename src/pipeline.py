@@ -20,6 +20,7 @@ from src.gemini_client import GeminiClient, StepResponse
 from src.image_handler import ImageHandler
 from utils.output_handler import OutputHandler
 from src.logging_utils import step_context
+from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,10 @@ class Pipeline:
             output_dir=Path(output_dir),
             run_label=run_label,
         )
+        # 초기 입력 이미지(단계별)를 보관합니다. key: step number -> list[PIL.Image]
+        self._initial_images: dict[int, list] = {}
+        # 사용자가 명시적으로 run_label을 제공했는지 여부
+        self._run_label_forced = run_label is not None
         # 사용자가 명시적으로 run_label을 제공했는지 여부를 보관합니다.
         self._run_label_forced = run_label is not None
 
@@ -149,14 +154,36 @@ class Pipeline:
             # 이미지 + 프롬프트 → parts 구성
             parts = ImageHandler.build_parts(prompt, image_path)
 
-            # 이전 단계에서 생성된 이미지가 있으면 parts 앞에 포함시킵니다.
-            # 단, 2단계에서는 이전 단계 결과물을 포함하지 않음
-            if previous_images and step_num != 2:
-                try:
-                    parts = [*previous_images, *parts]
-                    logger.info("이전 단계 생성 이미지(%d개)를 현재 요청에 포함했습니다.", len(previous_images))
-                except Exception:
-                    logger.info("이전 단계 생성 이미지를 요청에 포함하지 못했습니다.")
+            # 현재 parts에 포함된 입력 이미지를 캡처해 두면 이후 단계에서 재사용할 수 있습니다.
+            try:
+                imgs_in_parts = [p for p in parts if isinstance(p, PILImage.Image)]
+                if imgs_in_parts:
+                    self._initial_images[step_num] = imgs_in_parts
+            except Exception:
+                logger.debug("입력 이미지 캡처 실패 (무시)")
+
+            # Include images into parts with special handling per step:
+            # - Step 2: include Step1 original images (but do NOT include previous generated images)
+            # - Step 3: include Step1 originals plus previous generated images
+            # - Other steps: include previous generated images (if any)
+            try:
+                if step_num == 2:
+                    step1_imgs = self._initial_images.get(1, [])
+                    if step1_imgs:
+                        parts = [*step1_imgs, *parts]
+                        logger.info("Step %d에 Step1 원본 이미지(%d장)를 포함했습니다.", step_num, len(step1_imgs))
+                elif step_num == 3:
+                    step1_imgs = self._initial_images.get(1, [])
+                    merged_prev = [*step1_imgs, *previous_images] if (step1_imgs or previous_images) else []
+                    if merged_prev:
+                        parts = [*merged_prev, *parts]
+                        logger.info("Step %d에 Step1 원본 이미지(%d장) 및 이전 생성 이미지(%d장)를 포함했습니다.", step_num, len(step1_imgs), len(previous_images))
+                else:
+                    if previous_images:
+                        parts = [*previous_images, *parts]
+                        logger.info("이전 단계 생성 이미지(%d개)를 현재 요청에 포함했습니다.", len(previous_images))
+            except Exception:
+                logger.info("이전 단계 생성 이미지를 요청에 포함하지 못했습니다.")
 
             # 이전 단계의 응답 텍스트가 있으면 parts에 포함시킵니다.
             # 단, 2단계에서는 이전 단계 결과물을 포함하지 않음
