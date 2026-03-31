@@ -19,6 +19,8 @@ class ImageHandler:
 
     # 최근 선택된 파일 목록 (빌드 파트에서 채워짐)
     _last_selected_files: list[Path] | None = None
+    # 마지막 선택이 'all'로 이루어졌는지 여부 (빌드 파트에서 설정)
+    _last_selection_was_all: bool = False
 
     # Gemini가 지원하는 이미지 확장자
     SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
@@ -69,6 +71,9 @@ class ImageHandler:
         Returns:
             Gemini API에 전달할 parts 리스트.
         """
+        # 초기화: 이전 선택 관련 상태 리셋
+        ImageHandler._last_selection_was_all = False
+
         if image_path is not None:
             path = Path(image_path)
 
@@ -133,8 +138,9 @@ class ImageHandler:
                     logger.exception("이미지 선택 과정에서 오류 발생 — 모든 후보 사용")
                     selected_files = candidates
 
-                # 기록: 최근 선택된 파일들
+                # 기록: 최근 선택된 파일들 및 'all' 선택 여부
                 ImageHandler._last_selected_files = selected_files
+                ImageHandler._last_selection_was_all = len(selected_files) == len(candidates)
 
                 images: list[Image.Image] = []
                 for child in selected_files:
