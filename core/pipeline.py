@@ -12,57 +12,17 @@ Gemini는 전체 대화 맥락을 가지고 각 단계에 응답합니다.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from config.prompts import PIPELINE_STEPS
-from src.gemini_client import GeminiClient, StepResponse
-from src.image_handler import ImageHandler
-from utils.output_handler import OutputHandler
-from src.logging_utils import step_context
+from core.models import StepResult, PipelineResult, StepResponse
+from services.gemini_client import GeminiClient
+from handlers.image_handler import ImageHandler
+from handlers.output_handler import OutputHandler
+from utils.logging_utils import step_context
 from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class StepResult:
-    """단계별 실행 결과."""
-
-    step: int
-    name: str
-    description: str
-    prompt: str
-    image_path: Path | None
-    response: str                              # Gemini 텍스트 응답
-    generated_images: list = field(default_factory=list)  # Gemini 생성 이미지
-    output_file: Path | None = None
-
-
-@dataclass
-class PipelineResult:
-    """전체 파이프라인 실행 결과."""
-
-    steps: list[StepResult] = field(default_factory=list)
-
-    @property
-    def final_output(self) -> str:
-        """마지막 단계의 응답을 반환합니다."""
-        if not self.steps:
-            return ""
-        return self.steps[-1].response
-
-    def summary(self) -> str:
-        """각 단계 결과의 요약 문자열을 반환합니다."""
-        lines = ["=" * 60, "파이프라인 실행 요약", "=" * 60]
-        for result in self.steps:
-            lines.append(f"\n[Step {result.step}] {result.description}")
-            lines.append(f"  입력 이미지: {result.image_path or '없음'}")
-            lines.append(f"  생성 이미지: {len(result.generated_images)}장")
-            lines.append(f"  저장 위치:   {result.output_file or '저장 안 함'}")
-            lines.append(f"  응답 길이:   {len(result.response)}자")
-        lines.append("\n" + "=" * 60)
-        return "\n".join(lines)
 
 
 class Pipeline:
@@ -298,14 +258,13 @@ class Pipeline:
                     except Exception:
                         logger.exception("Step %d: 가이드라인 이미지 로드 실패 — 프롬프트만 사용합니다.", step_num)
                 elif step_num == 3:
-                    step1_imgs = self._initial_images.get(1, [])
-                    merged_prev = [*step1_imgs, *prev_imgs] if (step1_imgs or prev_imgs) else []
+                    # step1_imgs = self._initial_images.get(1, [])
+                    merged_prev = [ *prev_imgs] if prev_imgs else []
                     if merged_prev:
                         parts = [*merged_prev, *parts]
                         logger.info(
-                            "Step %d에 Step1 원본 이미지(%d장) 및 이전 생성 이미지(%d장)를 포함했습니다.",
+                            "Step %d에 이전 생성 이미지(%d장)를 포함했습니다.",
                             step_num,
-                            len(step1_imgs),
                             len(prev_imgs),
                         )
                 else:

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import time
 import logging
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from PIL import Image as PILImage
@@ -26,19 +25,9 @@ from config.gemini_config import (
     MAX_RETRIES,
     RETRY_DELAY,
 )
+from core.models import StepResponse
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class StepResponse:
-    """단일 API 호출의 결과 (텍스트 + 생성 이미지 목록)."""
-
-    text: str = ""
-    images: list[PILImage.Image] = field(default_factory=list)
-
-    def has_image(self) -> bool:
-        return len(self.images) > 0
 
 
 class GeminiClient:

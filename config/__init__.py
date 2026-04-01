@@ -9,3 +9,5 @@ __all__ = [
     "SAFETY_SETTINGS",
     "PIPELINE_STEPS",
 ]
+
+# NOTE: config 패키지의 내용은 변경 없음. api_config, gemini_config, prompts 구조 유지.
