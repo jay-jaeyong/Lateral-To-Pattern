@@ -236,6 +236,12 @@ class GeminiClient:
 
         Adds optional ANSI colors when stdout is a TTY.
         """
+        try:
+            return self._format_chat_history_for_log_inner()
+        except Exception as exc:
+            return f"<chat history formatting failed: {exc}>"
+
+    def _format_chat_history_for_log_inner(self) -> str:
         history = self.chat_history
         if not history:
             return "<empty chat history>"
@@ -328,7 +334,7 @@ class GeminiClient:
                 except Exception:
                     out_lines.append(f"{label}: <failed to render part>")
 
-        return "\n".join(out_lines)
+        return "\n".join(out_lines) if out_lines else "<empty chat history>"
 
     def _flatten_parts(self, parts: list) -> list:
         """Recursively flatten lists/tuples inside parts but keep strings and image objects intact.

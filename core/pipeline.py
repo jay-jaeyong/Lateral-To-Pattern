@@ -16,6 +16,7 @@ from pathlib import Path
 
 from config.prompts import PIPELINE_STEPS
 from core.models import StepResult, PipelineResult, StepResponse
+from core._parts_builder import build_step_parts
 from services.gemini_client import GeminiClient
 from handlers.image_handler import ImageHandler
 from handlers.output_handler import OutputHandler
@@ -70,13 +71,24 @@ class Pipeline:
         """
         if not base_path.is_dir():
             return base_path
+        # 1) 정확히 일치
         target = base_path / model_name
         if target.is_dir():
             logger.info("모델 서브폴더 발견: %s", target)
             return target
+        # 2) 공백 → 언더스코어 변환 후 재시도
+        target_under = base_path / model_name.replace(" ", "_")
+        if target_under.is_dir():
+            logger.info("모델 서브폴더 발견 (공백→_): %s", target_under)
+            return target_under
+        # 3) 언더스코어 → 공백 변환 후 재시도
+        target_space = base_path / model_name.replace("_", " ")
+        if target_space.is_dir():
+            logger.info("모델 서브폴더 발견 (_→공백): %s", target_space)
+            return target_space
         subdirs = sorted([d for d in base_path.iterdir() if d.is_dir()])
         if subdirs:
-            logger.info(
+            logger.warning(
                 "모델명(%s)과 일치하는 폴더 없음 → 첫 번째 폴더 사용: %s",
                 model_name,
                 subdirs[0],
@@ -234,68 +246,27 @@ class Pipeline:
         with step_context(step_num):
             logger.info("─── Step %d: %s ───", step_num, description)
 
-            # 이미지 + 프롬프트 → parts 구성 (prebuilt_parts가 제공되면 재사용)
-            parts = prebuilt_parts if prebuilt_parts is not None else ImageHandler.build_parts(prompt, image_path)
-
-            # Include images into parts with special handling per step:
-            # - Step 2: do NOT include Step1 original images (and do NOT include previous generated images)
-            # - Step 3: include Step1 originals plus previous generated images
-            # - Other steps: include previous generated images (if any)
+            # ── parts 조립 (core/_parts_builder.py) ──────────────────────────
             try:
-                prev_imgs = previous_images or []
-                if step_num == 2:
-                    # Step 2: 이전 단계의 원본/생성 이미지는 포함하지 않고,
-                    # 반드시 해당 단계의 가이드라인 이미지 디렉터리(image_path)와
-                    # 프롬프트만 사용합니다.
-                    try:
-                        if image_path is not None:
-                            # image_path가 디렉터리(또는 파일)일 경우 내부 이미지를 로드함.
-                            parts = ImageHandler.build_parts(prompt, image_path)
-                            logger.info("Step %d: 가이드라인 이미지(%s)와 프롬프트만 사용합니다.", step_num, image_path)
-                        else:
-                            parts = [prompt]
-                            logger.info("Step %d: image_path 없음 — 프롬프트만 사용합니다.", step_num)
-                    except Exception:
-                        logger.exception("Step %d: 가이드라인 이미지 로드 실패 — 프롬프트만 사용합니다.", step_num)
-                elif step_num == 3:
-                    # step1_imgs = self._initial_images.get(1, [])
-                    merged_prev = [ *prev_imgs] if prev_imgs else []
-                    if merged_prev:
-                        parts = [*merged_prev, *parts]
-                        logger.info(
-                            "Step %d에 이전 생성 이미지(%d장)를 포함했습니다.",
-                            step_num,
-                            len(prev_imgs),
-                        )
-                else:
-                    if prev_imgs:
-                        parts = [*prev_imgs, *parts]
-                        logger.info("이전 단계 생성 이미지(%d개)를 현재 요청에 포함했습니다.", len(prev_imgs))
+                parts = build_step_parts(
+                    step_num=step_num,
+                    prompt=prompt,
+                    image_path=image_path,
+                    prev_images=previous_images or [],
+                    prev_texts=previous_texts or [],
+                    prebuilt_parts=prebuilt_parts,
+                )
             except Exception:
-                logger.info("이전 단계 생성 이미지를 요청에 포함하지 못했습니다.")
+                logger.exception("parts 조립 실패 — 프롬프트만으로 진행합니다.")
+                parts = [prompt]
 
-            # 현재 parts에 포함된 입력 이미지를 캡처해 두면 이후 단계에서 재사용할 수 있습니다.
+            # ── 입력 이미지 캡처 (이후 단계 재사용용) ──────────────────────
             try:
                 imgs_in_parts = [p for p in parts if isinstance(p, PILImage.Image)]
                 if imgs_in_parts:
                     self._initial_images[step_num] = imgs_in_parts
             except Exception:
                 logger.debug("입력 이미지 캡처 실패 (무시)")
-
-            # 이전 단계의 응답 텍스트가 있으면 parts에 포함시킵니다.
-            # 단, 2단계에서는 이전 단계 결과물을 포함하지 않음
-            if previous_texts and step_num != 2:
-                try:
-                    prev_combined = "\n\n".join(
-                        f"[Previous Step {i+1} Output]\n{txt}" for i, txt in enumerate(previous_texts) if txt
-                    )
-                    if parts and isinstance(parts[-1], str):
-                        parts.insert(len(parts) - 1, prev_combined)
-                    else:
-                        parts.append(prev_combined)
-                    logger.info("이전 단계 출력(%d개)을 현재 요청에 포함했습니다.", len(previous_texts))
-                except Exception:
-                    logger.info("이전 단계 출력을 요청에 포함하지 못했습니다.")
 
             # 이미지 선택이 발생했고, 사용자가 run_label을 명시하지 않았다면
             # 출력 레이블을 선택한 이미지 이름으로 설정합니다 (실제 디렉터리 생성 전).
