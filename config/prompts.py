@@ -73,7 +73,7 @@ PIPELINE_STEPS: list[dict] = [
                     },
                     "view_mapping": {
                         "lateral_view": "좌측 상단 이미지는 왼쪽, 우측 상단 이미지는 오른쪽 면을 채우는 데 참고해",
-                        "top_view": "발등 부분만 참고하여 그대로 맞춰서 채워",
+                        "top_view": "발등 부분만 참고하여 vamp 부위 그대로 맞춰서 채워",
                         "back_view": "뒤꿈치 부분을 채워",
                         "guideline": "아래쪽이 발등 부분이고 위쪽이 뒷꿈치 부분이야"
                     },
