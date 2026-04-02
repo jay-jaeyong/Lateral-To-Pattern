@@ -16,9 +16,9 @@ from google.genai import types
 MODEL_NAME = "gemini-3-pro-image-preview"
 
 # ─────────────────────────────────────────────
-# 응답 모달리티 (텍스트 + 이미지 모두 요청)
+# 응답 모달리티 (이미지만 요청)
 # ─────────────────────────────────────────────
-RESPONSE_MODALITIES = ["TEXT", "IMAGE"]
+RESPONSE_MODALITIES = ["IMAGE"]
 
 # ─────────────────────────────────────────────
 # 출력 이미지 설정 (4K 해상도 + 자동 비율 적용)
