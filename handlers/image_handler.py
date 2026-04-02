@@ -77,91 +77,92 @@ class ImageHandler:
         if image_path is not None:
             path = Path(image_path)
 
-            # 디렉터리인 경우 내부의 모든 지원 이미지 파일을 로드합니다.
             if path.is_dir():
-                candidates = [
-                    child
-                    for child in sorted(path.iterdir())
-                    if child.is_file() and child.suffix.lower() in ImageHandler.SUPPORTED_EXTENSIONS
-                ]
+                # ── 서브폴더가 있으면 폴더 선택 모드 ──────────────────────────────
+                subdirs = sorted(
+                    [child for child in path.iterdir()
+                     if child.is_dir() and not child.name.startswith(".")]
+                )
 
-                if not candidates:
-                    logger.info("이미지 없음: %s — 프롬프트만으로 진행합니다.", path)
-                    return [prompt]
+                if subdirs:
+                    selected_dirs = ImageHandler._select_subdir(path, subdirs)
+                    ImageHandler._last_selected_files = selected_dirs
+                    ImageHandler._last_selection_was_all = len(selected_dirs) == len(subdirs)
 
-                # 여러 이미지가 있을 경우, 대화형 콘솔이면 사용자에게 선택권을 제공합니다.
-                selected_files: list[Path]
-                try:
-                    import sys
+                    # 선택된 첫 번째 폴더의 이미지를 전부 로드합니다.
+                    # (batch "all" 실행 시 pipeline이 나머지 폴더를 순회합니다.)
+                    return ImageHandler._load_dir_images(selected_dirs[0], prompt)
 
-                    if len(candidates) > 1 and sys.stdin.isatty():
-                        print("다음 이미지들이 발견되었습니다:")
-                        for i, c in enumerate(candidates, start=1):
-                            print(f"  {i}) {c.name}")
-                        raw = input(
-                            "선택할 이미지 번호를 쉼표로 구분하여 입력하세요 (예: 1,3). 'all' 입력 또는 빈값은 모두 선택합니다: "
-                        ).strip()
+                # ── 서브폴더 없음 → 현재 디렉터리의 이미지 파일을 그대로 로드 ──
+                return ImageHandler._load_dir_images(path, prompt)
 
-                        if raw == "" or raw.lower() in ("all", "a"):
-                            selected_files = candidates
-                        else:
-                            indices: list[int] = []
-                            for token in [t.strip() for t in raw.split(",") if t.strip()]:
-                                if "-" in token:
-                                    try:
-                                        a, b = token.split("-", 1)
-                                        a_i = int(a)
-                                        b_i = int(b)
-                                        indices.extend(range(a_i, b_i + 1))
-                                    except Exception:
-                                        logger.info("무시된 입력 토큰: %s", token)
-                                else:
-                                    try:
-                                        indices.append(int(token))
-                                    except Exception:
-                                        logger.info("무시된 입력 토큰: %s", token)
-
-                            # 1-based indices -> files
-                            selected_files = []
-                            for idx in indices:
-                                if 1 <= idx <= len(candidates):
-                                    f = candidates[idx - 1]
-                                    if f not in selected_files:
-                                        selected_files.append(f)
-                            if not selected_files:
-                                logger.info("유효한 선택이 없어 모든 파일을 사용합니다.")
-                                selected_files = candidates
-                    else:
-                        # 비대화형(또는 하나뿐인 경우): 모든 후보 사용
-                        selected_files = candidates
-                except Exception:
-                    logger.exception("이미지 선택 과정에서 오류 발생 — 모든 후보 사용")
-                    selected_files = candidates
-
-                # 기록: 최근 선택된 파일들 및 'all' 선택 여부
-                ImageHandler._last_selected_files = selected_files
-                ImageHandler._last_selection_was_all = len(selected_files) == len(candidates)
-
-                images: list[Image.Image] = []
-                for child in selected_files:
-                    try:
-                        images.append(ImageHandler.load(child))
-                    except Exception as exc:  # 로그는 남기고 다음 파일로 진행
-                        logger.warning("이미지 로드 실패: %s — %s", child, exc)
-
-                # 이미지가 하나도 없으면 프롬프트만으로 진행
-                if not images:
-                    logger.info("선택된 이미지 없음: %s — 프롬프트만으로 진행합니다.", path)
-                    return [prompt]
-
-                return [*images, prompt]
-            # 파일인 경우 기존 동작 유지
+            # ── 단일 파일 ────────────────────────────────────────────────────────
             if path.is_file():
                 ImageHandler._last_selected_files = [path]
                 image = ImageHandler.load(path)
                 return [image, prompt]
 
-            # 파일인 경우 기존 동작 유지
-            image = ImageHandler.load(path)
-            return [image, prompt]
         return [prompt]
+
+    # ──────────────────────────────────────────────────
+    # 내부 헬퍼
+    # ──────────────────────────────────────────────────
+
+    @staticmethod
+    def _select_subdir(base: Path, subdirs: list[Path]) -> list[Path]:
+        """콘솔에서 서브폴더를 선택합니다. 비대화형이면 전체를 반환합니다."""
+        import sys
+
+        if len(subdirs) == 1 or not sys.stdin.isatty():
+            return subdirs
+
+        print(f"\n[{base.name}] 다음 모델 폴더들이 발견되었습니다:")
+        for i, d in enumerate(subdirs, start=1):
+            # 폴더 안 이미지 수도 함께 표시
+            img_count = sum(
+                1 for f in d.iterdir()
+                if f.is_file() and f.suffix.lower() in ImageHandler.SUPPORTED_EXTENSIONS
+            )
+            print(f"  {i}) {d.name}  ({img_count}장)")
+
+        raw = input(
+            "폴더 번호를 입력하세요 (예: 2). 'all' 또는 빈값은 전체 폴더를 순서대로 실행합니다: "
+        ).strip()
+
+        if raw == "" or raw.lower() in ("all", "a"):
+            return subdirs
+
+        try:
+            idx = int(raw) - 1
+            if 0 <= idx < len(subdirs):
+                return [subdirs[idx]]
+            logger.info("범위를 벗어난 번호 — 첫 번째 폴더를 사용합니다.")
+            return [subdirs[0]]
+        except ValueError:
+            logger.info("올바르지 않은 입력 — 첫 번째 폴더를 사용합니다.")
+            return [subdirs[0]]
+
+    @staticmethod
+    def _load_dir_images(folder: Path, prompt: str) -> list:
+        """폴더 안의 지원 이미지를 전부 로드해 [*images, prompt]를 반환합니다."""
+        image_files = sorted(
+            f for f in folder.iterdir()
+            if f.is_file() and f.suffix.lower() in ImageHandler.SUPPORTED_EXTENSIONS
+        )
+        if not image_files:
+            logger.info("폴더에 이미지 없음: %s — 프롬프트만으로 진행합니다.", folder)
+            return [prompt]
+
+        images: list[Image.Image] = []
+        for f in image_files:
+            try:
+                images.append(ImageHandler.load(f))
+            except Exception as exc:
+                logger.warning("이미지 로드 실패: %s — %s", f, exc)
+
+        if not images:
+            logger.info("로드된 이미지 없음: %s — 프롬프트만으로 진행합니다.", folder)
+            return [prompt]
+
+        logger.info("폴더 '%s'에서 이미지 %d장 로드 완료", folder.name, len(images))
+        return [*images, prompt]
