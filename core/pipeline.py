@@ -103,6 +103,13 @@ class Pipeline:
             각 단계의 결과를 담은 PipelineResult 객체.
         """
         logger.info("파이프라인 시작 (총 %d 단계)", len(self._steps))
+
+        # ── 런타임 캐시 초기화 (디스크 output/images에는 영향 없음) ──────────
+        ImageHandler._last_selected_files = None
+        ImageHandler._last_selection_was_all = False
+        self._initial_images.clear()
+        logger.debug("런타임 캐시 초기화 완료")
+
         self._client.start_chat()
 
         pipeline_result = PipelineResult()
