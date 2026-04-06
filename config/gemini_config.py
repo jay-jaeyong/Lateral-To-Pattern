@@ -53,11 +53,26 @@ SAFETY_SETTINGS = [
 ]
 
 # ─────────────────────────────────────────────
+# Step 1 전용 이미지 설정 (21:9 가로 비율)
+# ─────────────────────────────────────────────
+STEP1_IMAGE_CONFIG = types.ImageConfig(
+    aspect_ratio="21:9"
+)
+
+# ─────────────────────────────────────────────
 # 채팅 세션 GenerateContentConfig
 # ─────────────────────────────────────────────
 CHAT_CONFIG = types.GenerateContentConfig(
     response_modalities=RESPONSE_MODALITIES,
     image_config=IMAGE_CONFIG,
+    safety_settings=SAFETY_SETTINGS,
+    temperature=0,
+)
+
+# Step 1 전용 GenerateContentConfig (1:4 비율, 나머지 설정 동일)
+STEP1_CHAT_CONFIG = types.GenerateContentConfig(
+    response_modalities=RESPONSE_MODALITIES,
+    image_config=STEP1_IMAGE_CONFIG,
     safety_settings=SAFETY_SETTINGS,
     temperature=0,
 )
