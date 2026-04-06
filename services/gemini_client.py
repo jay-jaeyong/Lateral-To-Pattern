@@ -65,12 +65,14 @@ class GeminiClient:
     # 메시지 전송
     # ──────────────────────────────────────────────────
 
-    def send(self, parts: list) -> StepResponse:
+    def send(self, parts: list, config_override=None) -> StepResponse:
         """메시지(텍스트 + 이미지 등)를 채팅 세션으로 전송하고 응답을 반환합니다.
 
         Args:
             parts: Gemini에 전달할 콘텐츠 리스트.
                    예: [PIL.Image.Image, "프롬프트 텍스트"]
+            config_override: 이 메시지에만 적용할 GenerateContentConfig.
+                             None이면 채팅 세션의 기본 config 사용.
 
         Returns:
             StepResponse: 텍스트와 생성된 이미지 목록을 담은 결과 객체.
@@ -139,7 +141,7 @@ class GeminiClient:
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 logger.debug("API 호출 시도 %d/%d", attempt, MAX_RETRIES)
-                response = self._chat.send_message(parts)
+                response = self._chat.send_message(parts, config=config_override)
                 result = self._parse_response(response)
 
                 logger.debug(

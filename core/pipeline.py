@@ -15,6 +15,7 @@ import logging
 from pathlib import Path
 
 from config.prompts import PIPELINE_STEPS
+from config.gemini_config import STEP1_CHAT_CONFIG
 from core.models import StepResult, PipelineResult, StepResponse
 from core._parts_builder import build_step_parts
 from services.gemini_client import GeminiClient
@@ -311,7 +312,9 @@ class Pipeline:
                 logger.info("%s\n[ CHAT HISTORY BEFORE SEND ]\n<failed to format history>\n%s", sep, sep)
 
             # Gemini API 호출 → 텍스트 + 생성 이미지
-            step_response: StepResponse = self._client.send(parts)
+            # Step 1은 1:4 비율 config, 나머지(2, 3)는 기본 config(auto)
+            config_override = STEP1_CHAT_CONFIG if step_num == 1 else None
+            step_response: StepResponse = self._client.send(parts, config_override=config_override)
 
             # 결과 저장
             output_file: Path | None = None
