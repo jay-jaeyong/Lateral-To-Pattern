@@ -70,8 +70,8 @@ PIPELINE_STEPS: list[dict] = [
                 },
                 "task_rules": {
                     "component_management": {
-                        "MIDSOLE, TONGUE (설포), LACE(신발끈)는 완전 삭제하고 가려진 부분 채워줘",
-                        "preserve": ["악세서리 (누락 없이 완벽하게 구현)"]
+                        "MIDSOLE, TONGUE(설포), LACE(신발끈)는 완전 삭제하고 채워줘",
+                        "preserve": "악세서리 (누락 없이 완벽하게 구현)"
                     },
                     "view_mapping": {
                         "lateral_view": "첫번쨰 그림 1번이 왼쪽, 2번 이미지는 오른쪽 면을 채우는 데 사용해",
