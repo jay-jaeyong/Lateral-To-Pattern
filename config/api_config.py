@@ -4,7 +4,7 @@ API Key Management
 API 키를 파일로 관리하는 옵션을 우선 지원합니다.
 
 우선순위
- 1. `config/APIkey` 파일 (추천)
+ 1. `/Users/jay/Documents/geminiapi.txt` 파일 (추천)
  2. 환경변수 `GEMINI_API_KEY`
  3. 프로젝트 루트의 `.env` 파일
 
@@ -33,11 +33,11 @@ def _read_key_file(path: Path) -> str | None:
 def get_api_key() -> str:
     """다양한 소스에서 Gemini API 키를 가져옵니다.
 
-    우선순위: `config/APIkey` 파일 -> 환경변수 `GEMINI_API_KEY` -> `.env` 파일
+    우선순위: `/Users/jay/Documents/geminiapi.txt` -> 환경변수 `GEMINI_API_KEY` -> `.env` 파일
     반환값은 앞뒤 공백이 제거된 문자열입니다.
     """
-    # 1) config/APIkey 파일 우선
-    cfg_file = Path(__file__).parent / "APIkey"
+    # 1) 로컬 키 파일 우선
+    cfg_file = Path("/Users/jay/Documents/geminiapi.txt")
     key = _read_key_file(cfg_file)
     if key:
         return key
@@ -52,7 +52,7 @@ def get_api_key() -> str:
     raise EnvironmentError(
         "Gemini API 키를 찾을 수 없습니다.\n"
         "다음 중 하나로 설정하세요:\n"
-        " 1) 파일에 API 키 저장: config/APIkey (파일 내용만 키 값)\n"
+        " 1) 파일에 API 키 저장: /Users/jay/Documents/geminiapi.txt (파일 내용만 키 값)\n"
         " 2) 환경변수로 설정: export GEMINI_API_KEY=your_key_here\n"
         " 3) 프로젝트 루트에 .env 파일 생성: GEMINI_API_KEY=your_key_here\n"
     )
