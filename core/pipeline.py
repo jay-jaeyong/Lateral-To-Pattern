@@ -15,10 +15,9 @@ import logging
 from pathlib import Path
 
 from config.prompts import PIPELINE_STEPS
-from config.gemini_config import STEP1_CHAT_CONFIG
 from core.models import StepResult, PipelineResult, StepResponse
 from core._parts_builder import build_step_parts
-from services.gemini_client import GeminiClient
+from services import get_client
 from handlers.image_handler import ImageHandler
 from handlers.output_handler import OutputHandler
 from utils.logging_utils import step_context
@@ -39,6 +38,7 @@ class Pipeline:
         steps: list[dict] | None = None,
         output_dir: Path | str = Path("output"),
         run_label: str | None = None,
+        provider: str = "gemini",
     ) -> None:
         """
         Args:
@@ -46,9 +46,11 @@ class Pipeline:
                    None이면 config/prompts.py의 PIPELINE_STEPS 사용.
             output_dir: 결과 파일을 저장할 디렉터리.
             run_label: 실행 식별자 (출력 파일명에 사용). None이면 타임스탬프 자동 생성.
+            provider: 사용할 API ("gemini" 또는 "openai"/"gpt").
         """
         self._steps = steps or PIPELINE_STEPS
-        self._client = GeminiClient()
+        self._provider = provider
+        self._client = get_client(provider)
         self._output_handler = OutputHandler(
             output_dir=Path(output_dir),
             run_label=run_label,
@@ -144,6 +146,7 @@ class Pipeline:
                                 steps=per_steps,
                                 output_dir=base_output_dir,
                                 run_label=Path(f).stem,
+                                provider=self._provider,
                             )
                             try:
                                 sub_result = per_pipeline.run(skip_initial_selection=True)
@@ -311,10 +314,9 @@ class Pipeline:
             except Exception:
                 logger.info("%s\n[ CHAT HISTORY BEFORE SEND ]\n<failed to format history>\n%s", sep, sep)
 
-            # Gemini API 호출 → 텍스트 + 생성 이미지
-            # Step 1은 1:4 비율 config, 나머지(2, 3)는 기본 config(auto)
-            config_override = STEP1_CHAT_CONFIG if step_num == 1 else None
-            step_response: StepResponse = self._client.send(parts, config_override=config_override)
+            # API 호출 → 텍스트 + 생성 이미지
+            # Step 1은 21:9 비율 (Gemini: STEP1_CHAT_CONFIG / OpenAI: 1536x1024)
+            step_response: StepResponse = self._client.send(parts, step_num=step_num)
 
             # 결과 저장
             output_file: Path | None = None

@@ -56,3 +56,26 @@ def get_api_key() -> str:
         " 2) 환경변수로 설정: export GEMINI_API_KEY=your_key_here\n"
         " 3) 프로젝트 루트에 .env 파일 생성: GEMINI_API_KEY=your_key_here\n"
     )
+
+
+def get_openai_api_key() -> str:
+    """OpenAI(GPT) API 키를 가져옵니다.
+
+    우선순위: `/Users/jay/Documents/openaiapi.txt` -> 환경변수 `OPENAI_API_KEY` -> `.env` 파일
+    """
+    cfg_file = Path("/Users/jay/Documents/openaiapi.txt")
+    key = _read_key_file(cfg_file)
+    if key:
+        return key
+
+    key = os.environ.get("OPENAI_API_KEY")
+    if key:
+        return key.strip()
+
+    raise EnvironmentError(
+        "OpenAI API 키를 찾을 수 없습니다.\n"
+        "다음 중 하나로 설정하세요:\n"
+        " 1) 파일에 API 키 저장: /Users/jay/Documents/openaiapi.txt (파일 내용만 키 값)\n"
+        " 2) 환경변수로 설정: export OPENAI_API_KEY=your_key_here\n"
+        " 3) 프로젝트 루트에 .env 파일 생성: OPENAI_API_KEY=your_key_here\n"
+    )

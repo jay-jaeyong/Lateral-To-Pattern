@@ -216,21 +216,22 @@ class OutputHandler:
 
     @staticmethod
     def _serialize_history(history: list) -> list[dict]:
-        """Gemini 채팅 히스토리를 JSON 직렬화 가능한 형태로 변환합니다."""
+        """채팅 히스토리(Gemini/OpenAI 양쪽)를 JSON 직렬화 가능한 형태로 변환합니다."""
         serialized = []
         for turn in history:
             parts_data = []
-            for part in turn.parts:
+            for part in getattr(turn, "parts", []) or []:
                 if getattr(part, "text", None):
                     parts_data.append({"type": "text", "content": part.text})
                 elif getattr(part, "inline_data", None):
+                    mime = getattr(part.inline_data, "mime_type", "unknown")
                     parts_data.append({
                         "type": "image",
-                        "content": f"[이미지 데이터 mime_type={part.inline_data.mime_type}]",
+                        "content": f"[이미지 데이터 mime_type={mime}]",
                     })
                 else:
                     parts_data.append({"type": "unknown", "content": str(part)})
-            serialized.append({"role": turn.role, "parts": parts_data})
+            serialized.append({"role": getattr(turn, "role", "unknown"), "parts": parts_data})
         return serialized
 
     @staticmethod

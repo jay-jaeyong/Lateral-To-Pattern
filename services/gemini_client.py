@@ -22,6 +22,7 @@ from config.api_config import get_api_key
 from config.gemini_config import (
     MODEL_NAME,
     CHAT_CONFIG,
+    STEP1_CHAT_CONFIG,
     MAX_RETRIES,
     RETRY_DELAY,
 )
@@ -65,14 +66,15 @@ class GeminiClient:
     # 메시지 전송
     # ──────────────────────────────────────────────────
 
-    def send(self, parts: list, config_override=None) -> StepResponse:
+    def send(self, parts: list, step_num: int | None = None, config_override=None) -> StepResponse:
         """메시지(텍스트 + 이미지 등)를 채팅 세션으로 전송하고 응답을 반환합니다.
 
         Args:
             parts: Gemini에 전달할 콘텐츠 리스트.
                    예: [PIL.Image.Image, "프롬프트 텍스트"]
-            config_override: 이 메시지에만 적용할 GenerateContentConfig.
-                             None이면 채팅 세션의 기본 config 사용.
+            step_num: 현재 파이프라인 단계 번호. step_num==1이면 STEP1_CHAT_CONFIG(21:9)를 사용.
+            config_override: 명시적으로 지정한 GenerateContentConfig. None이고 step_num도 없으면
+                             채팅 세션의 기본 config 사용.
 
         Returns:
             StepResponse: 텍스트와 생성된 이미지 목록을 담은 결과 객체.
@@ -80,6 +82,8 @@ class GeminiClient:
         Raises:
             RuntimeError: 채팅 세션이 시작되지 않은 경우 또는 MAX_RETRIES 초과 시.
         """
+        if config_override is None and step_num == 1:
+            config_override = STEP1_CHAT_CONFIG
         if self._chat is None:
             raise RuntimeError(
                 "채팅 세션이 시작되지 않았습니다. start_chat()을 먼저 호출하세요."

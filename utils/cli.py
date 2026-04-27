@@ -47,6 +47,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Step 3에서 사용할 이미지 경로 (미입력 시 config/prompts.py 설정 사용)",
     )
     parser.add_argument(
+        "--provider",
+        choices=["gemini", "gpt", "openai"],
+        default=None,
+        help="사용할 API 제공자 (gemini | gpt). 미입력 시 시작할 때 대화형으로 묻습니다.",
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="상세 로그 출력",
