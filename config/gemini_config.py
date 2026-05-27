@@ -56,7 +56,8 @@ SAFETY_SETTINGS = [
 # Step 1 전용 이미지 설정 (21:9 가로 비율)
 # ─────────────────────────────────────────────
 STEP1_IMAGE_CONFIG = types.ImageConfig(
-    aspect_ratio="21:9"
+    image_size="4K",
+    aspect_ratio="21:9",
 )
 
 # ─────────────────────────────────────────────
