@@ -90,6 +90,44 @@ STEP1_CHAT_CONFIG = types.GenerateContentConfig(
 )
 
 # ─────────────────────────────────────────────
+# 동적 비율 선택용 헬퍼
+# (가이드라인 이미지의 실제 비율에 가장 가까운 Gemini 지원 비율을 고름)
+# ─────────────────────────────────────────────
+SUPPORTED_ASPECT_RATIOS: list[tuple[str, float]] = [
+    ("1:1", 1.0),
+    ("3:4", 3 / 4), ("4:3", 4 / 3),
+    ("4:5", 4 / 5), ("5:4", 5 / 4),
+    ("2:3", 2 / 3), ("3:2", 3 / 2),
+    ("9:16", 9 / 16), ("16:9", 16 / 9),
+    ("21:9", 21 / 9),
+    ("1:4", 1 / 4), ("4:1", 4.0),
+    ("1:8", 1 / 8), ("8:1", 8.0),
+]
+
+
+def closest_aspect_ratio(width: int, height: int) -> str:
+    """가로/세로 크기에 가장 가까운 Gemini 지원 비율 문자열을 반환합니다."""
+    if height <= 0:
+        return "1:1"
+    target = width / height
+    return min(SUPPORTED_ASPECT_RATIOS, key=lambda x: abs(x[1] - target))[0]
+
+
+def make_chat_config(aspect_ratio: str | None = None) -> types.GenerateContentConfig:
+    """주어진 aspect_ratio로 GenerateContentConfig를 동적으로 생성합니다.
+
+    image_size, safety_settings, temperature는 기본 CHAT_CONFIG와 동일.
+    """
+    img_cfg = types.ImageConfig(image_size="4K", aspect_ratio=aspect_ratio)
+    return types.GenerateContentConfig(
+        response_modalities=RESPONSE_MODALITIES,
+        image_config=img_cfg,
+        safety_settings=SAFETY_SETTINGS,
+        temperature=0,
+    )
+
+
+# ─────────────────────────────────────────────
 # 재시도 설정
 # ─────────────────────────────────────────────
 MAX_RETRIES = 3       # API 호출 실패 시 최대 재시도 횟수

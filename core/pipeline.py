@@ -15,6 +15,7 @@ import logging
 from pathlib import Path
 
 from config.prompts import PIPELINE_STEPS
+from config.gemini_config import closest_aspect_ratio, make_chat_config
 from core.models import StepResult, PipelineResult, StepResponse
 from core._parts_builder import build_step_parts
 from services.gemini_client import GeminiClient
@@ -311,8 +312,26 @@ class Pipeline:
                 logger.info("%s\n[ CHAT HISTORY BEFORE SEND ]\n<failed to format history>\n%s", sep, sep)
 
             # Gemini API 호출 → 텍스트 + 생성 이미지
-            # Step 1은 STEP1_CHAT_CONFIG(21:9), 그 외는 채팅 세션의 기본 CHAT_CONFIG
-            step_response: StepResponse = self._client.send(parts, step_num=step_num)
+            # Step 1: STEP1_CHAT_CONFIG(21:9)
+            # Step 2: 가이드라인 이미지의 비율에 가장 가까운 Gemini 지원 비율을 동적 결정
+            # Step 3: 채팅 세션의 기본 CHAT_CONFIG (auto)
+            config_override = None
+            if step_num == 2:
+                imgs_in_parts = [p for p in parts if isinstance(p, PILImage.Image)]
+                if imgs_in_parts:
+                    # parts 구성: [Step1 결과 이미지(들), 가이드라인 이미지(들), 프롬프트]
+                    # → 가이드라인은 리스트의 마지막 PIL 이미지
+                    guideline_img = imgs_in_parts[-1]
+                    aspect = closest_aspect_ratio(*guideline_img.size)
+                    config_override = make_chat_config(aspect)
+                    logger.info(
+                        "Step 2 aspect_ratio: %s (가이드라인 %dx%d → ratio %.3f)",
+                        aspect, guideline_img.size[0], guideline_img.size[1],
+                        guideline_img.size[0] / guideline_img.size[1],
+                    )
+            step_response: StepResponse = self._client.send(
+                parts, step_num=step_num, config_override=config_override
+            )
 
             # 결과 저장
             output_file: Path | None = None
