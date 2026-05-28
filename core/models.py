@@ -3,7 +3,7 @@ Data Models
 -----------
 파이프라인 실행에 사용되는 데이터 클래스 정의.
 
-- StepResponse  : 단일 Gemini API 호출 결과 (텍스트 + 이미지)
+- StepResponse  : 단일 GPT API 호출 결과 (텍스트 + 이미지)
 - StepResult    : 파이프라인 단계별 실행 결과
 - PipelineResult: 전체 파이프라인 실행 결과
 """
@@ -36,8 +36,8 @@ class StepResult:
     description: str
     prompt: str
     image_path: Path | None
-    response: str                              # Gemini 텍스트 응답
-    generated_images: list = field(default_factory=list)  # Gemini 생성 이미지
+    response: str                              # GPT 텍스트 응답
+    generated_images: list = field(default_factory=list)  # GPT 생성 이미지
     output_file: Path | None = None
 
 

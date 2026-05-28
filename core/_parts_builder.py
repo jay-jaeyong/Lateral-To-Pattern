@@ -1,7 +1,7 @@
 """
 Parts Builder
 --------------
-각 파이프라인 단계의 Gemini/OpenAI 입력 parts를 조립합니다.
+각 파이프라인 단계의 OpenAI Responses API 입력 parts를 조립합니다.
 
 Responses API + previous_response_id 체이닝 사용 시 이전 단계 컨텍스트는
 서버가 자동으로 이어주므로, 매 단계에는 **현재 단계의 새 입력만** 보냅니다.

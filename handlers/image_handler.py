@@ -1,7 +1,7 @@
 """
 Image Handler
 --------------
-이미지 파일을 로드하고 Gemini API에 전달 가능한 형태로 변환합니다.
+이미지 파일을 로드하고 GPT API에 전달 가능한 형태로 변환합니다.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ class ImageHandler:
     # 마지막 선택이 'all'로 이루어졌는지 여부 (빌드 파트에서 설정)
     _last_selection_was_all: bool = False
 
-    # Gemini가 지원하는 이미지 확장자
+    # GPT(image_generation 도구)가 지원하는 이미지 확장자
     SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 
     @staticmethod
@@ -59,7 +59,7 @@ class ImageHandler:
 
     @staticmethod
     def build_parts(prompt: str, image_path: Path | str | None) -> list:
-        """Gemini API에 전달할 parts 리스트를 구성합니다.
+        """GPT API에 전달할 parts 리스트를 구성합니다.
 
         이미지가 있으면 [image, prompt] 순서로 구성합니다.
         이미지가 없으면 [prompt]만 반환합니다.
@@ -69,7 +69,7 @@ class ImageHandler:
             image_path: 이미지 파일 경로 (None이면 텍스트만).
 
         Returns:
-            Gemini API에 전달할 parts 리스트.
+            GPT API에 전달할 parts 리스트.
         """
         # 초기화: 이전 선택 관련 상태 리셋
         ImageHandler._last_selection_was_all = False

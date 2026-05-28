@@ -19,7 +19,7 @@ client.responses.create() + image_generation 도구로 멀티턴 이미지 생�
 MODEL_NAME = "gpt-5.5"
 
 # ─────────────────────────────────────────────
-# 추론 깊이 (Gemini의 thinking_level 대응)
+# 추론 깊이 (GPT reasoning effort)
 #   "low" | "medium"(기본) | "high" | "xhigh"
 # ─────────────────────────────────────────────
 REASONING_EFFORT = "high"

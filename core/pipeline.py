@@ -132,7 +132,7 @@ class Pipeline:
                     # 사용자가 'all'을 선택했고, 여러 파일이 선택되었다면
                     # 각 파일마다 전체 파이프라인을 별도 실행합니다.
                     if selection_all and selected_files and len(selected_files) > 1:
-                        base_output_dir = self._output_handler._run_dir.parent
+                        base_output_dir = self._output_handler._output_dir
                         for f in selected_files:
                             per_steps = [dict(s) for s in self._steps]
                             # 첫 스텝의 image_path를 해당 파일로 고정

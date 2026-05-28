@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 class OutputHandler:
     """파이프라인 실행 결과를 파일로 저장합니다."""
 
+    # GPT 브랜치 식별용 접미사 (Gemini 브랜치 결과와 폴더명을 구분)
+    _SUFFIX = "_gpt"
+
     def __init__(
         self,
         output_dir: Path = Path("output"),
@@ -34,19 +37,31 @@ class OutputHandler:
         """
         Args:
             output_dir: 결과 파일을 저장할 최상위 디렉터리.
-            run_label: 실행 식별자. None이면 실행 시각 기반의 레이블 자동 생성.
+            run_label: 실행 식별자. None이면 라벨 없이 output_dir에 바로 저장합니다
+                       (이후 set_run_label로 이미지 선택 시 라벨이 갱신됨).
         """
         self._output_dir = output_dir
-        base = run_label or datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.set_run_label(base)
+        if run_label:
+            self.set_run_label(run_label)
+        else:
+            # 라벨이 없으면 타임스탬프 폴더를 만들지 않고 output_dir 자체를 run_dir로 사용
+            self._run_label = ""
+            self._run_dir = output_dir
         # run dir is created lazily to allow image selection and other setup
         # to happen before filesystem side-effects. Actual directory creation
         # and logging occurs in `_ensure_run_dir()` when saving.
         self._run_dir_created = False
 
     def set_run_label(self, label: str) -> None:
-        """run_label을 갱신하고 run_dir 경로를 다시 계산합니다."""
-        self._run_label = label or "untitled"
+        """run_label을 갱신하고 run_dir 경로를 다시 계산합니다.
+
+        GPT 브랜치임을 명시하기 위해 끝에 _gpt 접미사를 자동으로 붙입니다 (중복 방지).
+        """
+        clean = label or "untitled"
+        if clean.endswith(self._SUFFIX):
+            self._run_label = clean
+        else:
+            self._run_label = f"{clean}{self._SUFFIX}"
         self._run_dir = self._output_dir / self._run_label
 
     @property

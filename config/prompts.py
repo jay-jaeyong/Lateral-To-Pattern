@@ -1,85 +1,115 @@
 """
-Gemini Model Configuration
----------------------------
-Gemini API 모델 및 생성 파라미터 설정.
-모델 변경이나 생성 파라미터 조정은 이 파일에서만 수행하세요.
+Pipeline Step Prompts
+----------------------
+각 단계(Step)별 프롬프트와 이미지 경로를 관리합니다.
+파이프라인의 동작을 변경하고 싶다면 이 파일만 수정하세요.
 
-사용 SDK: google-genai (신규 SDK)
+구조:
+    PIPELINE_STEPS: 순서대로 실행될 단계 목록
+        - step       : 단계 번호 (1부터 시작)
+        - name       : 단계 식별자 (영문, 공백 없음)
+        - description: 단계 설명
+        - prompt     : GPT에 전달할 프롬프트 텍스트
+        - image_path : 이 단계에서 사용할 이미지 경로 (None이면 이미지 없이 진행)
+        - save_output: True이면 이 단계의 결과를 output/ 에 저장
 """
 
-from google.genai import types
+from pathlib import Path
 
-# ─────────────────────────────────────────────
-# 사용할 Gemini 모델
-# ─────────────────────────────────────────────
-# gemini-3-pro-image-preview: 이미지 생성/편집 지원 (Nano Banana Pro)
-MODEL_NAME = "gemini-3-pro-image-preview"
+# 프로젝트 루트 기준 이미지 폴더
+IMAGES_BASE = Path("images")
 
-# ─────────────────────────────────────────────
-# 응답 모달리티 (이미지만 요청)
-# ─────────────────────────────────────────────
-RESPONSE_MODALITIES = ["IMAGE"]
-
-# ─────────────────────────────────────────────
-# 출력 이미지 설정 (4K 해상도 + 자동 비율 적용)
-# ─────────────────────────────────────────────
-# image_size: "512", "1K", "2K", "4K" 중 선택 가능
-# aspect_ratio를 설정하지 않으면 모델이 최적의 비율을 자동으로 선택합니다.
-IMAGE_CONFIG = types.ImageConfig(
-    image_size="4K",
-    aspect_ratio=None  # 또는 아예 이 라인을 삭제해도 무방합니다.
-)
-
-# ─────────────────────────────────────────────
-# 안전 설정
-# ─────────────────────────────────────────────
-SAFETY_SETTINGS = [
-    types.SafetySetting(
-        category="HARM_CATEGORY_HARASSMENT",
-        threshold="BLOCK_MEDIUM_AND_ABOVE",
-    ),
-    types.SafetySetting(
-        category="HARM_CATEGORY_HATE_SPEECH",
-        threshold="BLOCK_MEDIUM_AND_ABOVE",
-    ),
-    types.SafetySetting(
-        category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
-        threshold="BLOCK_MEDIUM_AND_ABOVE",
-    ),
-    types.SafetySetting(
-        category="HARM_CATEGORY_DANGEROUS_CONTENT",
-        threshold="BLOCK_MEDIUM_AND_ABOVE",
-    ),
+# ─────────────────────────────────────────────────────────────────────────────
+# 파이프라인 단계 정의
+# 각 단계는 previous_response_id 체이닝으로 이전 단계 컨텍스트가 자동 유지된 채 실행됩니다.
+# ─────────────────────────────────────────────────────────────────────────────
+PIPELINE_STEPS: list[dict] = [
+    {
+        "step": 1,
+        "name": "level_1_style_change",
+        "description": "Step 1 - 이미지 스타일 바꾸기",
+        "prompt": (
+            """{
+                "persona": "정밀 복제 전문가",
+                "task": [
+                    "원본 사진을 보고 정확하게 신발의 모든 선을 구분해서 색깔 없는 라인 아트로 그리기",
+                    "신발의 모든 선, 글자, 구멍, 재봉선, 윤곽, 무늬 등 모든 특징을 정확하게 그려",
+                    "1, 2, 3에 입력 순서대로 제공된 칸을 채우고 번호를 써줘",
+                    "1번은 Toe가 오른쪽으로 가게 채워",
+                    "2번은 Toe가 왼쪽으로 가게 채워",
+                    "1,2번은 그림의 위치가 같은 높이 + 같은 사이즈",
+                    "3번은 발등이 아래로 가게 채워"
+                ],
+                "caution": [
+                    "****실물과 똑같이 그릴 것****",
+                    "검정색으로 칠해진 부분은 흰색 배경으로 바꿔줘"
+                ],
+            }"""
+        ),
+        "image_path": IMAGES_BASE / "step1",
+        "save_output": True,
+    },
+    {
+         "step": 2,
+        "name": "level_2_pattern_generation",
+        "description": "Step 2 - 이미지 펼치기",
+        "prompt": (
+            """{
+                "task": {
+                    "description": "멀티뷰 신발 사진의 디자인을 제공된 윤곽 라인에 맞춰 도면으로 펼칠 것",
+                    "instructions": [
+                        "멀티뷰 그림을 참고해 MIDSOLE 라인 위쪽의 모든 부분을 가이드라인 안에 들어가게 채워",
+                        "추가나 삭제 없이 원본 디자인 요소를 그대로 유지",
+                        "망사 패턴이나 검은색으로 채워진 부분은 흰색 배경으로 바꿔줘.",
+                        "실은 무늬가 아니야. 실도 실물과 똑같이 그려",
+                    ]
+                },
+                "task_rules": {
+                    "component_management": {
+                        "MIDSOLE, TONGUE(설포), LACE(신발끈)는 완전 삭제하고 채워줘",
+                        "preserve": "악세서리 (누락 없이 완벽하게 구현)"
+                    },
+                    "view_mapping": {
+                        "lateral_view": "멀티뷰 1번 이미지는 왼쪽, 멀티뷰 2번 이미지는 오른쪽 면을 채우는 데 사용해",
+                        "top_view": "멀티뷰 3번 이미지는 1번과 2번의 vamp를 연결할 때 사용해",
+                        "guideline": "아래쪽이 발등 부분이고 위쪽이 뒷꿈치 부분이야"
+                    },
+                    "layering_rule": "부위가 겹치는 경우 오른쪽이 위로 오도록 그려"
+                },
+                "caution": [
+                    "입력 이미지에 없는 선/점선/스티치/패턴은 **절대 생성하지 말고**, 보이지 않으면 비워둬",
+                    "가이드라인을 벗어나서는 안돼",
+                    "*멀티뷰를 보고 Vamp를 '끊김없이 자연스럽고 오차없이' TopView를 연결하는게 핵심이야*"
+                ]
+            }"""     
+        ),
+        "image_path": IMAGES_BASE / "step2",
+        "save_output": True,
+    },
+    {
+        "step": 3,
+        "name": "level_3_guideline_addition",
+        "description": "Step 3 - 여분 가이드라인 추가",
+        "prompt": 
+            """
+                {
+                    "persona": [
+                        "실제 제조를 위해서 얼마나 자재의 여분이 있어야하는지 가이드라인이 제공됨.",
+                        "첫번째 사진에서 두번째 사진인 가이드라인까지 패턴을 확장해."
+                    ],
+                    "task": [
+                        "**추가로 제공**된 라인 끝까지 끊기지 않고 가이드에 밀착해서 채워줘",
+                        "망사 패턴의 무늬 또는 검정색으로 채워진 부분은 흰색 배경으로 바꿔줘",
+                        "이전에 펼쳐둔 그림은 절대 바꾸지말고 확장만 자연스럽게 시켜줘"
+                    ],
+                    "caution": [
+                        "가이드 라인 밖으로는 아무 무늬없이 흰색 배경으로 칠해줘",
+                        "입력 이미지에 없는 새로운 선/점선/스티치/패턴은 **절대 생성하지 말고**, 보이지 않으면 비워둬",
+                        "가이드라인 안에 맞춰서 이전 무늬를 자연스럽게 확장해줘"
+                    ]
+                }
+            """,
+        "image_path": IMAGES_BASE / "step3",
+        "save_output": True,
+    },
 ]
-
-# ─────────────────────────────────────────────
-# Step 1 전용 이미지 설정 (21:9 가로 비율)
-# ─────────────────────────────────────────────
-STEP1_IMAGE_CONFIG = types.ImageConfig(
-    image_size="4K",
-    aspect_ratio="21:9",
-)
-
-# ─────────────────────────────────────────────
-# 채팅 세션 GenerateContentConfig
-# ─────────────────────────────────────────────
-CHAT_CONFIG = types.GenerateContentConfig(
-    response_modalities=RESPONSE_MODALITIES,
-    image_config=IMAGE_CONFIG,
-    safety_settings=SAFETY_SETTINGS,
-    temperature=0,
-)
-
-# Step 1 전용 GenerateContentConfig (1:4 비율, 나머지 설정 동일)
-STEP1_CHAT_CONFIG = types.GenerateContentConfig(
-    response_modalities=RESPONSE_MODALITIES,
-    image_config=STEP1_IMAGE_CONFIG,
-    safety_settings=SAFETY_SETTINGS,
-    temperature=0,
-)
-
-# ─────────────────────────────────────────────
-# 재시도 설정
-# ─────────────────────────────────────────────
-MAX_RETRIES = 3       # API 호출 실패 시 최대 재시도 횟수
-RETRY_DELAY = 2.0     # 재시도 간격 (초)
