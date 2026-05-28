@@ -36,12 +36,18 @@ class OutputHandler:
             output_dir: 결과 파일을 저장할 최상위 디렉터리.
             run_label: 실행 식별자. None이면 실행 시각 기반의 레이블 자동 생성.
         """
-        self._run_label = run_label or datetime.now().strftime("%Y%m%d_%H%M%S")
-        self._run_dir = output_dir / self._run_label
+        self._output_dir = output_dir
+        base = run_label or datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.set_run_label(base)
         # run dir is created lazily to allow image selection and other setup
         # to happen before filesystem side-effects. Actual directory creation
         # and logging occurs in `_ensure_run_dir()` when saving.
         self._run_dir_created = False
+
+    def set_run_label(self, label: str) -> None:
+        """run_label을 갱신하고 run_dir 경로를 다시 계산합니다."""
+        self._run_label = label or "untitled"
+        self._run_dir = self._output_dir / self._run_label
 
     @property
     def run_dir(self) -> Path:
@@ -198,7 +204,7 @@ class OutputHandler:
             f"**프롬프트:**\n\n"
             f"```\n{prompt}\n```\n\n"
             f"---\n\n"
-            f"## Gemini 응답\n\n"
+            f"## API 응답\n\n"
             f"### 텍스트\n\n"
             f"{response}\n"
             f"{generated_section}"
@@ -216,7 +222,7 @@ class OutputHandler:
 
     @staticmethod
     def _serialize_history(history: list) -> list[dict]:
-        """채팅 히스토리(Gemini/OpenAI 양쪽)를 JSON 직렬화 가능한 형태로 변환합니다."""
+        """채팅 히스토리를 JSON 직렬화 가능한 형태로 변환합니다."""
         serialized = []
         for turn in history:
             parts_data = []

@@ -8,14 +8,11 @@ Lateral-To-Pattern — 메인 실행 파일
     python main.py --output-dir results
     python main.py --step1-image path/to/img.png --step2-image path/to/img2.png
 
-파이프라인 흐름:
-    이미지 + 프롬프트
-        → Gemini API (Step 1)
-        → 이미지 + 프롬프트
-        → Gemini API (Step 2)
-        → 이미지 + 프롬프트
-        → Gemini API (Step 3)
-        → output/ 저장
+파이프라인 흐름 (OpenAI Responses API + image_generation 도구):
+    Step 1 → 응답(r1)
+    Step 2 (previous_response_id=r1.id) → 응답(r2)
+    Step 3 (previous_response_id=r2.id) → 응답(r3)
+    → output/ 저장
 """
 
 from __future__ import annotations
@@ -45,8 +42,7 @@ def setup_logging(verbose: bool = False) -> None:
     handler.addFilter(StepFilter())
     logging.basicConfig(level=level, handlers=[handler])
     if not verbose:
-        logging.getLogger("google_genai").setLevel(logging.WARNING)
-        logging.getLogger("google_genai.models").setLevel(logging.WARNING)
+        logging.getLogger("openai").setLevel(logging.WARNING)
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -55,20 +51,6 @@ def setup_logging(verbose: bool = False) -> None:
 # 메인
 # ─────────────────────────────────────────────
 
-def _select_provider_interactive() -> str:
-    """시작 시 사용할 API를 콘솔에서 선택합니다 (비대화형이면 'gemini')."""
-    if not sys.stdin.isatty():
-        return "gemini"
-
-    print("\n사용할 API를 선택하세요:")
-    print("  1) Gemini")
-    print("  2) GPT (OpenAI)")
-    raw = input("번호 입력 [기본 1]: ").strip()
-    if raw in ("2", "gpt", "GPT", "openai"):
-        return "openai"
-    return "gemini"
-
-
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -76,14 +58,8 @@ def main() -> None:
     setup_logging(verbose=args.verbose)
     logger = logging.getLogger(__name__)
 
-    # 사용할 API 결정 (CLI > 대화형 > 기본 gemini)
-    if args.provider:
-        provider = "openai" if args.provider in ("gpt", "openai") else "gemini"
-    else:
-        provider = _select_provider_interactive()
-
     logger.info("=" * 60)
-    logger.info("Lateral-To-Pattern 파이프라인 시작 (provider: %s)", provider)
+    logger.info("Lateral-To-Pattern 파이프라인 시작 (GPT / Responses API)")
     logger.info("=" * 60)
 
     # CLI 이미지 경로 오버라이드 적용
@@ -138,7 +114,6 @@ def main() -> None:
         steps=steps,
         output_dir=Path(args.output_dir),
         run_label=run_label,
-        provider=provider,
     )
 
     try:

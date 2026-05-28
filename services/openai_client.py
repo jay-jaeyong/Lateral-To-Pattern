@@ -1,16 +1,13 @@
 """
-OpenAI (GPT) API Client
-------------------------
-gpt-image-2 모델로 이미지 생성/편집을 수행하는 클라이언트.
-GeminiClient와 동일한 인터페이스(start_chat / send / chat_history)를 제공해
-파이프라인 코드 변경 없이 교체할 수 있습니다.
+OpenAI (GPT) Responses API Client
+----------------------------------
+client.responses.create() + image_generation 도구로 멀티턴 이미지 생성.
 
-내부 동작:
-- send(parts)로 들어온 parts에서 텍스트는 합쳐 prompt로, PIL 이미지들은
-  reference 이미지로 넘겨 images.edit를 호출합니다.
-- 이미지가 하나도 없으면 images.generate를 사용합니다.
-- 채팅 히스토리는 로깅용으로만 보관합니다 (실제 멀티턴 컨텍스트는 파이프라인이
-  매 호출마다 prev_images / prev_texts를 parts에 누적해 넘겨주므로 별도 유지가 불필요).
+핵심 아이디어:
+- start_chat(): previous_response_id를 None으로 초기화 → 새 대화 시작
+- send(parts, step_num): 현재 단계 입력만 보냄. previous_response_id로 서버가
+  이전 단계 컨텍스트를 자동으로 이어줌. 이전 이미지/텍스트를 재전송할 필요 없음.
+- chat_history: 로깅용 (저장 등). 실제 대화 상태는 OpenAI 서버 + previous_response_id로 관리.
 """
 
 from __future__ import annotations
@@ -26,6 +23,9 @@ from openai import OpenAI
 from config.api_config import get_openai_api_key
 from config.openai_config import (
     MODEL_NAME,
+    REASONING_EFFORT,
+    TEXT_VERBOSITY,
+    IMAGE_DETAIL,
     SIZE_STEP1,
     SIZE_DEFAULT,
     QUALITY,
@@ -39,9 +39,8 @@ logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 채팅 히스토리 호환 객체 (GeminiClient의 history와 동일한 attribute 형태로 노출)
-# output_handler._serialize_history와 _format_chat_history_for_log_inner는
-# turn.role / turn.parts / part.text / part.inline_data.mime_type 만 사용합니다.
+# 채팅 히스토리 호환 객체 (output_handler가 turn.role / turn.parts / part.text /
+# part.inline_data.mime_type 만 사용하므로 그 attribute만 노출)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class _InlineData:
@@ -62,23 +61,28 @@ class _Turn:
 
 
 class OpenAIClient:
-    """OpenAI 이미지 생성 클라이언트 (GeminiClient와 동일한 인터페이스)."""
+    """OpenAI Responses API 기반 멀티턴 이미지 생성 클라이언트."""
 
     def __init__(self) -> None:
         self._client = OpenAI(api_key=get_openai_api_key())
+        self._previous_response_id: str | None = None
         self._history: list[_Turn] = []
         self._chat_started = False
-        logger.info("OpenAIClient 초기화 완료 (모델: %s)", MODEL_NAME)
+        logger.info(
+            "OpenAIClient 초기화 (모델: %s, reasoning=%s, image_detail=%s)",
+            MODEL_NAME, REASONING_EFFORT, IMAGE_DETAIL,
+        )
 
     # ──────────────────────────────────────────────────
-    # 채팅 세션 관리
+    # 세션 관리
     # ──────────────────────────────────────────────────
 
     def start_chat(self) -> None:
-        """새 세션을 시작합니다. 히스토리(로깅용)를 초기화합니다."""
+        """새 대화 세션 시작: previous_response_id와 히스토리를 초기화."""
+        self._previous_response_id = None
         self._history = []
         self._chat_started = True
-        logger.info("새 채팅 세션 시작 (OpenAI)")
+        logger.info("새 채팅 세션 시작 (Responses API, previous_response_id=None)")
 
     @property
     def chat_history(self) -> list:
@@ -89,22 +93,17 @@ class OpenAIClient:
     # ──────────────────────────────────────────────────
 
     def send(self, parts: list, step_num: int | None = None, config_override=None) -> StepResponse:
-        """parts(텍스트+이미지)를 OpenAI 이미지 API로 전송합니다.
+        """parts(텍스트+이미지)를 Responses API로 보냅니다.
 
-        Args:
-            parts: 텍스트 문자열과 PIL 이미지가 섞인 리스트.
-            step_num: 현재 단계 번호. step_num==1이면 21:9에 가장 가까운
-                      landscape 사이즈(1536x1024)를 사용합니다.
-            config_override: GeminiClient와의 인터페이스 호환을 위해 받음 (미사용).
+        previous_response_id 체이닝으로 이전 단계 맥락이 자동 누적되므로,
+        parts에는 **현재 단계의 새 입력만** 들어가야 합니다.
         """
         if not self._chat_started:
-            raise RuntimeError(
-                "채팅 세션이 시작되지 않았습니다. start_chat()을 먼저 호출하세요."
-            )
+            raise RuntimeError("채팅 세션이 시작되지 않았습니다. start_chat()을 먼저 호출하세요.")
 
         parts = self._flatten_parts(parts)
 
-        # 텍스트 / 이미지 분리
+        # 텍스트와 이미지 분리
         text_parts: list[str] = []
         image_parts: list[PILImage.Image] = []
         for p in parts:
@@ -113,54 +112,64 @@ class OpenAIClient:
             elif isinstance(p, PILImage.Image):
                 image_parts.append(p)
             else:
-                # 알 수 없는 타입 → repr로 텍스트화
                 text_parts.append(repr(p)[:1000])
 
-        prompt = "\n\n".join(t for t in text_parts if t).strip()
-        if not prompt:
-            prompt = "Generate an image."
+        prompt = "\n\n".join(t for t in text_parts if t).strip() or "Generate an image."
 
+        # 메시지 콘텐츠 구성: 이미지 먼저, 텍스트 마지막
+        content: list[dict] = []
+        for img in image_parts:
+            data_uri = self._pil_to_data_uri(img)
+            content.append({
+                "type": "input_image",
+                "image_url": data_uri,
+                "detail": IMAGE_DETAIL,
+            })
+        content.append({"type": "input_text", "text": prompt})
+
+        # image_generation 도구 설정 (Step1만 21:9)
         size = SIZE_STEP1 if step_num == 1 else SIZE_DEFAULT
-
-        # 공통 파라미터: size가 None이면 보내지 않음(모델 기본 사이즈 사용)
-        common: dict = {
-            "model": MODEL_NAME,
-            "prompt": prompt,
+        tool_config: dict = {
+            "type": "image_generation",
             "quality": QUALITY,
             "output_format": OUTPUT_FORMAT,
-            "n": 1,
         }
-        if size:
-            common["size"] = size
+        if size and size != "auto":
+            tool_config["size"] = size
 
-        # 요청/히스토리 로깅
-        sep_parts = self._format_parts_for_log(parts)
-        logger.debug("=== OpenAI API Request Parts ===\n%s", sep_parts)
+        # API 요청 페이로드
+        request: dict = {
+            "model": MODEL_NAME,
+            "input": [{"role": "user", "content": content}],
+            "tools": [tool_config],
+            "reasoning": {"effort": REASONING_EFFORT},
+            "text": {"verbosity": TEXT_VERBOSITY},
+        }
+        if self._previous_response_id:
+            request["previous_response_id"] = self._previous_response_id
+
         logger.debug(
-            "=== OpenAI API Call ===\nmodel=%s size=%s quality=%s format=%s images=%d prompt_len=%d",
-            MODEL_NAME, size, QUALITY, OUTPUT_FORMAT, len(image_parts), len(prompt),
+            "=== Responses API Call ===\nmodel=%s step=%s size=%s images=%d prompt_len=%d prev_id=%s",
+            MODEL_NAME, step_num, size, len(image_parts), len(prompt), self._previous_response_id,
         )
 
-        # API 호출 (재시도)
+        # 재시도 호출
         last_error: Exception | None = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                logger.debug("API 호출 시도 %d/%d", attempt, MAX_RETRIES)
-                if image_parts:
-                    files = [self._pil_to_upload(img, idx) for idx, img in enumerate(image_parts, start=1)]
-                    response = self._client.images.edit(image=files, **common)
-                else:
-                    response = self._client.images.generate(**common)
-
+                response = self._client.responses.create(**request)
                 generated = self._parse_response(response)
 
-                # 히스토리 누적 (로깅용)
+                # 다음 호출을 위해 response.id 보관
+                self._previous_response_id = getattr(response, "id", None)
+
+                # 히스토리(로깅용) 누적
                 self._record_turn("user", parts)
-                self._record_turn("assistant", [*generated.images, generated.text] if generated.text else list(generated.images))
+                self._record_turn("assistant", list(generated.images) + ([generated.text] if generated.text else []))
 
                 logger.debug(
-                    "API 응답 수신 완료 (텍스트: %d자, 이미지: %d장)",
-                    len(generated.text), len(generated.images),
+                    "응답 수신 완료 (텍스트: %d자, 이미지: %d장, new prev_id=%s)",
+                    len(generated.text), len(generated.images), self._previous_response_id,
                 )
                 return generated
             except Exception as exc:  # noqa: BLE001
@@ -170,7 +179,7 @@ class OpenAIClient:
                     time.sleep(RETRY_DELAY)
 
         raise RuntimeError(
-            f"OpenAI API 호출이 {MAX_RETRIES}회 실패했습니다."
+            f"OpenAI Responses API 호출이 {MAX_RETRIES}회 실패했습니다."
         ) from last_error
 
     # ──────────────────────────────────────────────────
@@ -178,37 +187,51 @@ class OpenAIClient:
     # ──────────────────────────────────────────────────
 
     @staticmethod
-    def _pil_to_upload(img: PILImage.Image, idx: int) -> tuple:
-        """PIL 이미지를 OpenAI SDK가 받는 (filename, bytes, content_type) 튜플로 변환."""
+    def _pil_to_data_uri(img: PILImage.Image) -> str:
+        """PIL 이미지를 data URI(base64 PNG)로 변환."""
         buf = BytesIO()
-        # PNG로 직렬화 (RGBA 허용 — gpt-image-2는 PNG/JPEG/WEBP 지원)
         save_img = img if img.mode in ("RGB", "RGBA") else img.convert("RGB")
         save_img.save(buf, format="PNG")
-        buf.seek(0)
-        return (f"image_{idx}.png", buf.getvalue(), "image/png")
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        return f"data:image/png;base64,{b64}"
 
     @staticmethod
     def _parse_response(response) -> StepResponse:
-        """gpt-image-2 응답에서 이미지를 추출합니다."""
+        """Responses API 응답에서 생성 이미지와 텍스트를 추출."""
         images: list[PILImage.Image] = []
-        for item in getattr(response, "data", []) or []:
-            b64 = getattr(item, "b64_json", None)
-            if b64:
-                try:
-                    img_bytes = base64.b64decode(b64)
-                    images.append(PILImage.open(BytesIO(img_bytes)))
-                except Exception:
-                    logger.exception("base64 이미지 디코드 실패")
-                continue
-            url = getattr(item, "url", None)
-            if url:
-                # URL 응답은 사용하지 않지만, 호환을 위해 기록만 남김
-                logger.warning("OpenAI 응답이 URL 형태로 반환됨 — b64_json만 처리됩니다: %s", url)
+        text_chunks: list[str] = []
 
-        return StepResponse(text="", images=images)
+        outputs = getattr(response, "output", None) or []
+        for item in outputs:
+            item_type = getattr(item, "type", None)
+
+            # image_generation_call: result에 base64 문자열
+            if item_type == "image_generation_call":
+                b64 = getattr(item, "result", None)
+                if b64:
+                    try:
+                        img_bytes = base64.b64decode(b64)
+                        images.append(PILImage.open(BytesIO(img_bytes)))
+                    except Exception:
+                        logger.exception("생성 이미지 디코드 실패")
+                continue
+
+            # message: content 안에 output_text가 있을 수 있음
+            if item_type == "message":
+                for c in getattr(item, "content", None) or []:
+                    txt = getattr(c, "text", None)
+                    if txt:
+                        text_chunks.append(txt)
+
+        # output_text 헬퍼가 있으면 보조로 활용
+        if not text_chunks:
+            out_text = getattr(response, "output_text", None)
+            if out_text:
+                text_chunks.append(out_text)
+
+        return StepResponse(text="\n".join(text_chunks).strip(), images=images)
 
     def _record_turn(self, role: str, parts: list) -> None:
-        """parts를 단순화한 형태로 히스토리에 기록합니다 (로깅용)."""
         rendered: list[_Part] = []
         for p in parts:
             if isinstance(p, str):
@@ -237,7 +260,7 @@ class OpenAIClient:
         return flat
 
     # ──────────────────────────────────────────────────
-    # 로깅 포매터 (Pipeline에서 호출되는 인터페이스)
+    # 로깅 포매터 (Pipeline에서 호출)
     # ──────────────────────────────────────────────────
 
     def _format_parts_for_log(self, parts: list) -> str:
@@ -248,16 +271,14 @@ class OpenAIClient:
                     filename = getattr(part, "filename", None)
                     size = getattr(part, "size", None)
                     mode = getattr(part, "mode", None)
-                    lines.append(
-                        f"part[{idx}]: Image filename={filename!r} size={size} mode={mode}"
-                    )
+                    lines.append(f"part[{idx}]: Image filename={filename!r} size={size} mode={mode}")
                 elif isinstance(part, str):
                     preview = " ".join(part.splitlines())[:200]
                     lines.append(f"part[{idx}]: Text(len={len(part)}) preview={preview!r}")
                 else:
                     lines.append(f"part[{idx}]: {type(part).__name__} repr={repr(part)[:200]}")
             except Exception:
-                lines.append(f"part[{idx}]: <failed to inspect part>")
+                lines.append(f"part[{idx}]: <failed to inspect>")
         return "\n".join(lines) if lines else "<no parts>"
 
     def _format_chat_history_for_log(self) -> str:

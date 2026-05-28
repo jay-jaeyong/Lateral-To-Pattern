@@ -1,12 +1,10 @@
 """
 Pipeline
 ---------
-멀티스텝 채팅 파이프라인.
+멀티스텝 이미지 생성 파이프라인 (OpenAI Responses API + image_generation 도구).
 
-이미지 + 프롬프트 → Gemini API → 이미지 + 프롬프트 → Gemini API → ... → output 저장
-
-각 단계는 이전 단계의 응답을 채팅 히스토리로 유지한 채 실행되므로,
-Gemini는 전체 대화 맥락을 가지고 각 단계에 응답합니다.
+이전 단계 컨텍스트는 OpenAI 서버가 previous_response_id 체이닝으로 자동
+유지하므로, 매 단계에는 현재 단계의 입력만 보냅니다.
 """
 
 from __future__ import annotations
@@ -17,7 +15,6 @@ from pathlib import Path
 from config.prompts import PIPELINE_STEPS
 from core.models import StepResult, PipelineResult, StepResponse
 from core._parts_builder import build_step_parts
-from services import get_client
 from handlers.image_handler import ImageHandler
 from handlers.output_handler import OutputHandler
 from utils.logging_utils import step_context
@@ -27,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class Pipeline:
-    """순차적 멀티스텝 Gemini 채팅 파이프라인.
+    """순차적 멀티스텝 채팅 파이프라인 (OpenAI Responses API).
 
     config/prompts.py에 정의된 PIPELINE_STEPS를 순서대로 실행합니다.
     각 단계는 동일한 채팅 세션 안에서 실행되어 컨텍스트가 유지됩니다.
@@ -38,7 +35,6 @@ class Pipeline:
         steps: list[dict] | None = None,
         output_dir: Path | str = Path("output"),
         run_label: str | None = None,
-        provider: str = "gemini",
     ) -> None:
         """
         Args:
@@ -46,11 +42,12 @@ class Pipeline:
                    None이면 config/prompts.py의 PIPELINE_STEPS 사용.
             output_dir: 결과 파일을 저장할 디렉터리.
             run_label: 실행 식별자 (출력 파일명에 사용). None이면 타임스탬프 자동 생성.
-            provider: 사용할 API ("gemini" 또는 "openai"/"gpt").
         """
         self._steps = steps or PIPELINE_STEPS
-        self._provider = provider
-        self._client = get_client(provider)
+        # 지연 import: core ↔ services 순환 의존 회피
+        from services.openai_client import OpenAIClient
+        self._client = OpenAIClient()
+
         self._output_handler = OutputHandler(
             output_dir=Path(output_dir),
             run_label=run_label,
@@ -116,9 +113,8 @@ class Pipeline:
         self._client.start_chat()
 
         pipeline_result = PipelineResult()
-        # 누적된 이전 단계의 텍스트 응답 및 생성 이미지를 보관합니다
-        previous_texts: list[str] = []
-        previous_images: list = []
+        # Responses API의 previous_response_id 체이닝이 서버에서 자동으로
+        # 이전 단계 컨텍스트를 이어주므로, 클라이언트에서 prev 누적은 불필요합니다.
         # 첫 단계(보통 Step1)에서 선택된 신발 모델명을 보관합니다
         model_name: str | None = None
 
@@ -146,7 +142,6 @@ class Pipeline:
                                 steps=per_steps,
                                 output_dir=base_output_dir,
                                 run_label=Path(f).stem,
-                                provider=self._provider,
                             )
                             try:
                                 sub_result = per_pipeline.run(skip_initial_selection=True)
@@ -160,12 +155,8 @@ class Pipeline:
                         # 'all'이 아닌 경우(단일 선택 또는 특정 인덱스 선택)
                         # 이미 build_parts를 통해 선택과 이미지 로딩이 끝났으므로,
                         # 해당 prebuilt_parts를 사용해 첫 스텝을 실행합니다.
-                        step_result = self._run_step(dict(first_cfg), previous_texts, previous_images, prebuilt_parts=prebuilt_parts)
+                        step_result = self._run_step(dict(first_cfg), prebuilt_parts=prebuilt_parts)
                         pipeline_result.steps.append(step_result)
-                        if step_result.response:
-                            previous_texts.append(step_result.response)
-                        if step_result.generated_images:
-                            previous_images.extend(step_result.generated_images)
 
                         # 선택된 파일명에서 모델명 추출
                         if getattr(ImageHandler, "_last_selected_files", None):
@@ -184,12 +175,8 @@ class Pipeline:
                                     step_config = dict(step_config)
                                     step_config["image_path"] = resolved
 
-                            step_result = self._run_step(step_config, previous_texts, previous_images)
+                            step_result = self._run_step(step_config)
                             pipeline_result.steps.append(step_result)
-                            if step_result.response:
-                                previous_texts.append(step_result.response)
-                            if step_result.generated_images:
-                                previous_images.extend(step_result.generated_images)
 
                         # 최종 결과 저장
                         last = pipeline_result.steps[-1] if pipeline_result.steps else None
@@ -215,7 +202,7 @@ class Pipeline:
                     step_config = dict(step_config)
                     step_config["image_path"] = resolved
 
-            step_result = self._run_step(step_config, previous_texts, previous_images)
+            step_result = self._run_step(step_config)
 
             # 첫 스텝(원래 Step1)의 실행 뒤에 모델명을 추출합니다.
             if step_config.get("step", 0) == self._steps[0].get("step", 0) and model_name is None:
@@ -225,10 +212,6 @@ class Pipeline:
                     logger.info("신발 모델명 인식: %s", model_name)
 
             pipeline_result.steps.append(step_result)
-            if step_result.response:
-                previous_texts.append(step_result.response)
-            if step_result.generated_images:
-                previous_images.extend(step_result.generated_images)
 
         # 최종 결과 저장
         last = pipeline_result.steps[-1] if pipeline_result.steps else None
@@ -245,7 +228,7 @@ class Pipeline:
     # 단계 실행
     # ──────────────────────────────────────────────────
 
-    def _run_step(self, config: dict, previous_texts: list[str] | None = None, previous_images: list | None = None, prebuilt_parts: list | None = None) -> StepResult:
+    def _run_step(self, config: dict, prebuilt_parts: list | None = None) -> StepResult:
         """단일 파이프라인 단계를 실행합니다."""
         step_num = config["step"]
         name = config["name"]
@@ -263,8 +246,6 @@ class Pipeline:
                     step_num=step_num,
                     prompt=prompt,
                     image_path=image_path,
-                    prev_images=previous_images or [],
-                    prev_texts=previous_texts or [],
                     prebuilt_parts=prebuilt_parts,
                 )
             except Exception:
@@ -285,10 +266,8 @@ class Pipeline:
                 selected_files = getattr(ImageHandler, "_last_selected_files", None)
                 if selected_files and not self._run_label_forced and not self._output_handler._run_dir_created:
                     new_label = self._output_handler._sanitize_filename(selected_files[0].stem)
-                    base_dir = self._output_handler._run_dir.parent
-                    self._output_handler._run_label = new_label
-                    self._output_handler._run_dir = base_dir / new_label
-                    logger.info("출력 디렉터리 레이블을 선택한 이미지로 설정: %s", new_label)
+                    self._output_handler.set_run_label(new_label)
+                    logger.info("출력 디렉터리 레이블을 선택한 이미지로 설정: %s", self._output_handler._run_label)
             except Exception:
                 logger.exception("선택 이미지로 출력 레이블을 설정하는 중 오류 발생")
 
@@ -315,7 +294,7 @@ class Pipeline:
                 logger.info("%s\n[ CHAT HISTORY BEFORE SEND ]\n<failed to format history>\n%s", sep, sep)
 
             # API 호출 → 텍스트 + 생성 이미지
-            # Step 1은 21:9 비율 (Gemini: STEP1_CHAT_CONFIG / OpenAI: 1536x1024)
+            # Step 1은 21:9 (3360x1440), 그 외는 image_generation 도구 기본 사이즈
             step_response: StepResponse = self._client.send(parts, step_num=step_num)
 
             # 결과 저장
