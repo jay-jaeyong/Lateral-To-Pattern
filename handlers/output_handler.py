@@ -216,7 +216,7 @@ class OutputHandler:
 
     @staticmethod
     def _serialize_history(history: list) -> list[dict]:
-        """채팅 히스토리(Gemini/OpenAI 양쪽)를 JSON 직렬화 가능한 형태로 변환합니다."""
+        """Gemini 채팅 히스토리를 JSON 직렬화 가능한 형태로 변환합니다."""
         serialized = []
         for turn in history:
             parts_data = []
