@@ -61,6 +61,15 @@ STEP1_IMAGE_CONFIG = types.ImageConfig(
 )
 
 # ─────────────────────────────────────────────
+# 사고 수준 (모든 단계 동일) — Gemini 3 Pro의 최대값은 "high"
+#   "low" | "medium" | "high"
+# ─────────────────────────────────────────────
+THINKING_CONFIG = types.ThinkingConfig(
+    thinking_level="high",
+    include_thoughts=False,
+)
+
+# ─────────────────────────────────────────────
 # 채팅 세션 GenerateContentConfig
 # ─────────────────────────────────────────────
 CHAT_CONFIG = types.GenerateContentConfig(
@@ -68,14 +77,16 @@ CHAT_CONFIG = types.GenerateContentConfig(
     image_config=IMAGE_CONFIG,
     safety_settings=SAFETY_SETTINGS,
     temperature=0,
+    thinking_config=THINKING_CONFIG,
 )
 
-# Step 1 전용 GenerateContentConfig (1:4 비율, 나머지 설정 동일)
+# Step 1 전용 GenerateContentConfig (21:9 비율, 나머지 설정 동일)
 STEP1_CHAT_CONFIG = types.GenerateContentConfig(
     response_modalities=RESPONSE_MODALITIES,
     image_config=STEP1_IMAGE_CONFIG,
     safety_settings=SAFETY_SETTINGS,
     temperature=0,
+    thinking_config=THINKING_CONFIG,
 )
 
 # ─────────────────────────────────────────────

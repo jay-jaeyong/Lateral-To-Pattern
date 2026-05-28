@@ -4,9 +4,12 @@ Parts Builder
 각 파이프라인 단계(step)에 맞게 Gemini API 전송용 parts 리스트를 조립합니다.
 
 조립 순서 (단계별):
-  Step 2: [이전_생성_이미지들, 가이드라인_이미지, 이전_텍스트, 프롬프트]
-  Step 3: [이전_생성_이미지들, 가이드라인_이미지, 이전_텍스트, 프롬프트]
-  기타:   [이전_생성_이미지들, step_이미지, 이전_텍스트, 프롬프트]
+  Step 2: [이전_생성_이미지들, 가이드라인_이미지, 프롬프트]
+  Step 3: [이전_생성_이미지들, 가이드라인_이미지, 프롬프트]
+  기타:   [이전_생성_이미지들, step_이미지, 프롬프트]
+
+이전 단계의 텍스트 응답은 parts에 동봉하지 않습니다 (Gemini chat 세션의
+히스토리에는 이미 남아 있으므로 모델은 이전 맥락을 알고 있습니다).
 """
 
 from __future__ import annotations
@@ -43,8 +46,7 @@ def build_step_parts(
     # ── 2. 이전 생성 이미지를 parts 앞에 추가 ──────────────────────────
     parts = _prepend_prev_images(step_num, parts, prev_images)
 
-    # ── 3. 이전 단계 텍스트를 프롬프트 바로 앞에 삽입 ──────────────────
-    parts = _insert_prev_texts(parts, prev_texts)
+    # ── (이전 단계 텍스트는 parts에 포함하지 않음. 채팅 히스토리에는 그대로 남아 있음) ──
 
     return parts
 
