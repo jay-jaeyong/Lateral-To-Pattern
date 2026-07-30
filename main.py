@@ -6,15 +6,11 @@ Lateral-To-Pattern — 메인 실행 파일
     python main.py
     python main.py --run-label my_experiment
     python main.py --output-dir results
-    python main.py --step1-image path/to/img.png --step2-image path/to/img2.png
+    python main.py --shoe-image path/to/side_view.png --guide-image path/to/guideline.jpg
 
 파이프라인 흐름:
-    이미지 + 프롬프트
-        → Gemini API (Step 1)
-        → 이미지 + 프롬프트
-        → Gemini API (Step 2)
-        → 이미지 + 프롬프트
-        → Gemini API (Step 3)
+    신발 실물 사진(사이드뷰) + 2D 펼침 가이드라인(틀) + 프롬프트
+        → Gemini API (패턴 펼치기)
         → output/ 저장
 """
 
@@ -67,47 +63,11 @@ def main() -> None:
     logger.info("=" * 60)
 
     # CLI 이미지 경로 오버라이드 적용
-    image_overrides = {
-        1: args.step1_image,
-        2: args.step2_image,
-        3: args.step3_image,
-    }
-    steps = apply_image_overrides(PIPELINE_STEPS, image_overrides)
-    # 콘솔에서 시작 단계를 선택하도록 대화형으로 묻습니다 (터미널이 아닐 경우 기본값 사용)
-    # Non-interactive: use CLI argument only. Remove interactive prompt.
-    start_step = args.start_step
-
-    max_step = max(s.get("step", 0) for s in PIPELINE_STEPS)
-    if start_step < 1 or start_step > max_step:
-        logger.error("유효하지 않은 start-step: %d (1-%d)", start_step, max_step)
-        sys.exit(2)
-
-    steps = [s for s in steps if s.get("step", 0) >= start_step]
-
-    # 실행 레이블(run_label)을 첫 단계의 입력 이미지 이름으로 설정합니다(가능한 경우).
-    def _derive_run_label(steps_list):
-        from pathlib import Path
-        from handlers.image_handler import ImageHandler
-
-        if not steps_list:
-            return None
-        first = steps_list[0]
-        img_path = first.get("image_path")
-        if not img_path:
-            return None
-        p = Path(img_path)
-        # 디렉터리면 내부 첫 이미지 파일명을 사용 (숨김파일 및 지원 확장자만)
-        if p.is_dir():
-            for child in sorted(p.iterdir()):
-                if child.is_file() and child.suffix.lower() in ImageHandler.SUPPORTED_EXTENSIONS:
-                    return child.stem.replace(" ", "_")
-            return None
-        # 파일이면 파일명 기반으로 레이블 생성
-        if p.is_file():
-            if p.suffix.lower() in ImageHandler.SUPPORTED_EXTENSIONS:
-                return p.stem.replace(" ", "_")
-            return None
-        return None
+    steps = apply_image_overrides(
+        PIPELINE_STEPS,
+        shoe_image=args.shoe_image,
+        guide_image=args.guide_image,
+    )
 
     # If the user provided an explicit run label, use it; otherwise we allow
     # the Pipeline to set the label based on the selected image later.

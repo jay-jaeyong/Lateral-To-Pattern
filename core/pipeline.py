@@ -5,7 +5,10 @@ Pipeline
 
 이미지 + 프롬프트 → Gemini API → 이미지 + 프롬프트 → Gemini API → ... → output 저장
 
-각 단계는 이전 단계의 응답을 채팅 히스토리로 유지한 채 실행되므로,
+현재는 '패턴 펼치기' 단일 스텝만 실행합니다.
+  [신발 실물 사진(사이드뷰), 2D 펼침 가이드라인(틀), 프롬프트] → Gemini API → output 저장
+
+여러 단계를 정의하면 이전 단계의 응답을 채팅 히스토리로 유지한 채 순차 실행되므로,
 Gemini는 전체 대화 맥락을 가지고 각 단계에 응답합니다.
 """
 
@@ -56,18 +59,17 @@ class Pipeline:
         self._initial_images: dict[int, list] = {}
         # 사용자가 명시적으로 run_label을 제공했는지 여부
         self._run_label_forced = run_label is not None
-        # 사용자가 명시적으로 run_label을 제공했는지 여부를 보관합니다.
-        self._run_label_forced = run_label is not None
 
     # ──────────────────────────────────────────────────
     # 실행
     # ──────────────────────────────────────────────────
 
     @staticmethod
-    def _resolve_model_subdir(base_path: Path, model_name: str) -> Path:
+    def _resolve_model_subdir(base_path: Path, model_name: str, fallback_to_first: bool = True) -> Path:
         """base_path 내에서 model_name과 일치하는 서브폴더를 반환합니다.
 
-        일치하는 폴더가 없으면 첫 번째 서브폴더를, 서브폴더가 없으면 base_path를 반환합니다.
+        일치하는 폴더가 없으면 fallback_to_first에 따라 첫 번째 서브폴더 또는
+        base_path를 그대로 반환합니다.
         """
         if not base_path.is_dir():
             return base_path
@@ -86,15 +88,79 @@ class Pipeline:
         if target_space.is_dir():
             logger.info("모델 서브폴더 발견 (_→공백): %s", target_space)
             return target_space
-        subdirs = sorted([d for d in base_path.iterdir() if d.is_dir()])
-        if subdirs:
-            logger.warning(
-                "모델명(%s)과 일치하는 폴더 없음 → 첫 번째 폴더 사용: %s",
-                model_name,
-                subdirs[0],
-            )
-            return subdirs[0]
+        if fallback_to_first:
+            subdirs = sorted([d for d in base_path.iterdir() if d.is_dir()])
+            if subdirs:
+                logger.warning(
+                    "모델명(%s)과 일치하는 폴더 없음 → 첫 번째 폴더 사용: %s",
+                    model_name,
+                    subdirs[0],
+                )
+                return subdirs[0]
         return base_path
+
+    @staticmethod
+    def _derive_model_name(image_path: Path | str | None) -> str | None:
+        """입력 이미지 경로에서 신발 모델명을 추론합니다.
+
+        모델 폴더들을 담고 있는 상위 폴더라면(아직 모델이 정해지지 않은 상태)
+        None을 반환합니다.
+        """
+        if image_path is None:
+            return None
+        path = Path(image_path)
+        if path.is_dir():
+            has_subdirs = any(
+                child.is_dir() and not child.name.startswith(".")
+                for child in path.iterdir()
+            )
+            return None if has_subdirs else path.name
+        if path.is_file():
+            return path.stem
+        return None
+
+    def _resolve_step_images(self, config: dict, model_name: str | None, is_first: bool) -> dict:
+        """모델명이 정해졌다면 이미지 경로를 해당 모델 서브폴더로 좁힙니다.
+
+        첫 스텝의 image_path는 이미 선택이 끝났으므로 건드리지 않습니다.
+        """
+        if not model_name:
+            return config
+
+        resolved = dict(config)
+
+        if not is_first and config.get("image_path") is not None:
+            resolved["image_path"] = self._resolve_model_subdir(Path(config["image_path"]), model_name)
+
+        if config.get("guide_image_path") is not None:
+            # 모델명과 같은 이름의 서브폴더가 있으면 그 안에서, 없으면 원래 폴더에서
+            # 가이드라인 파일을 찾습니다(파일명 키워드로 탐색).
+            resolved["guide_image_path"] = self._resolve_model_subdir(
+                Path(config["guide_image_path"]), model_name, fallback_to_first=False
+            )
+
+        return resolved
+
+    def _run_for_each(self, targets: list[Path], pipeline_result: PipelineResult) -> PipelineResult:
+        """선택된 모델 폴더마다 파이프라인을 개별 실행합니다('all' 선택)."""
+        base_output_dir = self._output_handler._run_dir.parent
+        for target in targets:
+            per_steps = [dict(s) for s in self._steps]
+            # 첫 스텝의 image_path를 해당 모델 폴더로 고정
+            per_steps[0]["image_path"] = Path(target)
+            per_pipeline = Pipeline(
+                steps=per_steps,
+                output_dir=base_output_dir,
+                run_label=Path(target).stem,
+            )
+            try:
+                sub_result = per_pipeline.run(skip_initial_selection=True)
+                pipeline_result.steps.extend(sub_result.steps)
+            except Exception:
+                logger.exception("모델별 파이프라인 실행 실패: %s", target)
+
+        logger.info("'all' 선택으로 인한 모델별 실행 완료")
+        return pipeline_result
 
     def run(self, skip_initial_selection: bool = False) -> PipelineResult:
         """파이프라인 전체를 실행합니다.
@@ -109,109 +175,52 @@ class Pipeline:
         # 누적된 이전 단계의 텍스트 응답 및 생성 이미지를 보관합니다
         previous_texts: list[str] = []
         previous_images: list = []
-        # 첫 단계(보통 Step1)에서 선택된 신발 모델명을 보관합니다
+        # 첫 단계에서 선택된 신발 모델명을 보관합니다
         model_name: str | None = None
+        # 첫 단계의 이미지 선택 결과(이미 로드된 parts)
+        prebuilt_parts: list | None = None
 
-        # --- 초기 선택(첫 스텝)에서 사용자가 'all'을 선택했는지 확인 ---
+        # --- 첫 스텝 입력(신발 실물 사진) 선택 ---
         if not skip_initial_selection and self._steps:
             first_cfg = self._steps[0]
             first_img_path = first_cfg.get("image_path")
             try:
                 if first_img_path is not None and Path(first_img_path).is_dir():
-                    # 사용자에게 파일 선택(또는 'all')을 묻되, 아직 API 호출은 하지 않습니다.
-                    prebuilt_parts = ImageHandler.build_parts(first_cfg["prompt"], first_img_path)
-                    selected_files = getattr(ImageHandler, "_last_selected_files", None)
+                    # 사용자에게 폴더 선택(또는 'all')을 묻되, 아직 API 호출은 하지 않습니다.
+                    prebuilt_parts = ImageHandler.build_parts(
+                        first_cfg["prompt"],
+                        first_img_path,
+                        max_images=first_cfg.get("max_images"),
+                    )
+                    selected_files = getattr(ImageHandler, "_last_selected_files", None) or []
                     selection_all = getattr(ImageHandler, "_last_selection_was_all", False)
 
-                    # 사용자가 'all'을 선택했고, 여러 파일이 선택되었다면
-                    # 각 파일마다 전체 파이프라인을 별도 실행합니다.
-                    if selection_all and selected_files and len(selected_files) > 1:
-                        base_output_dir = self._output_handler._run_dir.parent
-                        for f in selected_files:
-                            per_steps = [dict(s) for s in self._steps]
-                            # 첫 스텝의 image_path를 해당 파일로 고정
-                            per_steps[0]["image_path"] = Path(f)
-                            # 새 Pipeline 인스턴스로 각 파일별 실행 (run_label에 파일명 사용)
-                            per_pipeline = Pipeline(
-                                steps=per_steps,
-                                output_dir=base_output_dir,
-                                run_label=Path(f).stem,
-                            )
-                            try:
-                                sub_result = per_pipeline.run(skip_initial_selection=True)
-                                pipeline_result.steps.extend(sub_result.steps)
-                            except Exception:
-                                logger.exception("파일별 파이프라인 실행 실패: %s", f)
+                    # 'all'을 선택했다면 모델 폴더마다 전체 파이프라인을 별도 실행합니다.
+                    if selection_all and len(selected_files) > 1:
+                        return self._run_for_each(selected_files, pipeline_result)
 
-                        logger.info("'all' 선택으로 인한 파일별 실행 완료")
-                        return pipeline_result
-                    else:
-                        # 'all'이 아닌 경우(단일 선택 또는 특정 인덱스 선택)
-                        # 이미 build_parts를 통해 선택과 이미지 로딩이 끝났으므로,
-                        # 해당 prebuilt_parts를 사용해 첫 스텝을 실행합니다.
-                        step_result = self._run_step(dict(first_cfg), previous_texts, previous_images, prebuilt_parts=prebuilt_parts)
-                        pipeline_result.steps.append(step_result)
-                        if step_result.response:
-                            previous_texts.append(step_result.response)
-                        if step_result.generated_images:
-                            previous_images.extend(step_result.generated_images)
-
-                        # 선택된 파일명에서 모델명 추출
-                        if getattr(ImageHandler, "_last_selected_files", None):
-                            sel = ImageHandler._last_selected_files
-                            if sel:
-                                model_name = sel[0].stem
-                                logger.info("신발 모델명 인식: %s", model_name)
-
-                        # 남은 스텝(첫 스텝 제외)을 계속 실행
-                        for step_config in self._steps[1:]:
-                            step_num = step_config.get("step", 0)
-                            if step_num > 1 and model_name:
-                                img_path = step_config.get("image_path")
-                                if img_path is not None:
-                                    resolved = self._resolve_model_subdir(Path(img_path), model_name)
-                                    step_config = dict(step_config)
-                                    step_config["image_path"] = resolved
-
-                            step_result = self._run_step(step_config, previous_texts, previous_images)
-                            pipeline_result.steps.append(step_result)
-                            if step_result.response:
-                                previous_texts.append(step_result.response)
-                            if step_result.generated_images:
-                                previous_images.extend(step_result.generated_images)
-
-                        # 최종 결과 저장
-                        last = pipeline_result.steps[-1] if pipeline_result.steps else None
-                        self._output_handler.save_final(
-                            text=pipeline_result.final_output,
-                            generated_images=last.generated_images if last else [],
-                            chat_history=self._client.chat_history,
-                        )
-                        logger.info("파이프라인 완료")
-                        return pipeline_result
+                    if selected_files:
+                        model_name = selected_files[0].stem
+                        logger.info("신발 모델명 인식: %s", model_name)
             except Exception:
                 logger.exception("초기 선택 처리 중 오류 발생 — 기본 순차 실행으로 전환합니다")
+                prebuilt_parts = None
 
-        # --- 기본 단일 실행 흐름(또는 skip_initial_selection=True인 경우) ---
-        for step_config in self._steps:
-            step_num = step_config.get("step", 0)
-
-            # step 1 이후 단계에서 이미지 경로를 모델 서브폴더로 동적으로 교체합니다.
-            if step_num > 1 and model_name:
-                img_path = step_config.get("image_path")
-                if img_path is not None:
-                    resolved = self._resolve_model_subdir(Path(img_path), model_name)
-                    step_config = dict(step_config)
-                    step_config["image_path"] = resolved
-
-            step_result = self._run_step(step_config, previous_texts, previous_images)
-
-            # 첫 스텝(원래 Step1)의 실행 뒤에 모델명을 추출합니다.
-            if step_config.get("step", 0) == self._steps[0].get("step", 0) and model_name is None:
-                selected_files = getattr(ImageHandler, "_last_selected_files", None)
-                if selected_files:
-                    model_name = selected_files[0].stem
+        # --- 단계 순차 실행 ---
+        for index, step_config in enumerate(self._steps):
+            if model_name is None:
+                model_name = self._derive_model_name(step_config.get("image_path"))
+                if model_name:
                     logger.info("신발 모델명 인식: %s", model_name)
+
+            step_config = self._resolve_step_images(step_config, model_name, is_first=(index == 0))
+
+            step_result = self._run_step(
+                step_config,
+                previous_texts,
+                previous_images,
+                prebuilt_parts=prebuilt_parts if index == 0 else None,
+            )
 
             pipeline_result.steps.append(step_result)
             if step_result.response:
@@ -241,6 +250,7 @@ class Pipeline:
         description = config["description"]
         prompt = config["prompt"]
         image_path = config.get("image_path")
+        guide_image_path = config.get("guide_image_path")
         should_save = config.get("save_output", True)
 
         with step_context(step_num):
@@ -255,6 +265,8 @@ class Pipeline:
                     prev_images=previous_images or [],
                     prev_texts=previous_texts or [],
                     prebuilt_parts=prebuilt_parts,
+                    guide_image_path=guide_image_path,
+                    max_images=config.get("max_images"),
                 )
             except Exception:
                 logger.exception("parts 조립 실패 — 프롬프트만으로 진행합니다.")

@@ -1,20 +1,20 @@
 # Lateral-To-Pattern
 
-신발 측면(Lateral) 사진을 입력받아 Gemini AI를 이용해 **3단계 파이프라인**으로 재단 패턴(Pattern)을 자동 생성하는 도구입니다.
+신발 측면(Lateral) 실물 사진을 입력받아 Gemini AI로 재단 패턴(Pattern)을 자동 생성하는 도구입니다.
+현재는 **패턴 펼치기 단일 스텝**만 실행합니다.
 
 ---
 
 ## 개요
 
 ```
-신발 측면 사진
-    → [Step 1] 라인 아트 변환       (흑백 선화)
-    → [Step 2] 2D 패턴 전개         (어퍼를 평면으로 펼치기)
-    → [Step 3] 시접 가이드라인 추가  (제조용 여분 확장)
+[신발 실물 사진(사이드뷰) + 2D 펼침 가이드라인(틀) + 프롬프트]
+    → Gemini API (패턴 펼치기)
     → output/ 저장
 ```
 
-각 단계는 동일한 Gemini **채팅 세션**에서 실행되어 이전 대화 맥락이 유지됩니다.
+`config/prompts.py`의 `PIPELINE_STEPS`에 단계를 추가하면 동일한 Gemini **채팅 세션**에서
+순차 실행되어 이전 대화 맥락이 유지됩니다.
 
 ---
 
@@ -22,10 +22,13 @@
 
 ```
 Lateral-To-Pattern/
+├── run.sh                   # ★ 한 번에 환경 구성 + 실행 (uv 사용)
+├── pyproject.toml           # 의존성 정의
+├── uv.lock                  # 잠긴 의존성 버전 (커밋 대상)
 ├── main.py                  # 진입점
 │
 ├── config/                  # 설정 (수정 빈도 높음)
-│   ├── prompts.py           # ★ 각 Step의 프롬프트와 이미지 경로 정의
+│   ├── prompts.py           # ★ 프롬프트와 이미지 경로 정의
 │   ├── gemini_config.py     # 모델명, 생성 파라미터, 재시도 설정
 │   ├── api_config.py        # API 키 로드 로직
 │   └── APIkey               # Gemini API 키 파일 (Git 제외)
@@ -45,67 +48,73 @@ Lateral-To-Pattern/
 │   ├── cli.py               # CLI 인자 파서, 이미지 경로 오버라이드
 │   └── logging_utils.py     # Step 컨텍스트 로그 필터
 │
-├── images/                  # 입력 이미지 (단계별 하위 폴더)
-│   ├── step1/               # 신발 측면 원본 사진
-│   ├── step2/               # Step 2 가이드라인 이미지 (어퍼 실루엣)
-│   │   └── {모델명}/
-│   └── step3/               # Step 3 가이드라인 이미지 (시접 라인)
-│       └── {모델명}/
+├── images/                  # 입력 이미지 (전부 여기 바로 아래에 둡니다)
+│   ├── 가이드라인.jpg        # 파일명에 '가이드라인' 포함 → 펼칠 틀로 자동 인식
+│   ├── 나이키 탄준.jpg       # 나머지 이미지 = 신발 실물 사이드뷰
+│   └── 뉴발란스 992.png
 │
 └── output/                  # 생성 결과
-    └── {모델명}/
-        ├── step_01_level_1_style_change.md
-        ├── step_02_level_2_pattern_generation.md
-        ├── step_03_level_3_guideline_addition.md
+    └── {선택한 이미지 이름}/
+        ├── step_01_pattern_unfold.md
+        ├── step_02_line_art_conversion.md
         ├── final_output.md
         └── chat_history.json
 ```
 
+실행하면 가이드라인을 뺀 이미지 목록이 번호와 함께 뜹니다. 번호로 하나를 고르거나
+`all`을 입력하면 전부 순서대로 실행되고, 출력 폴더는 각 파일명으로 만들어집니다.
+
+가이드라인 판별 키워드는 `가이드라인`, `가이드`, `guideline`, `guide` 입니다
+([handlers/image_handler.py](handlers/image_handler.py)의 `GUIDELINE_KEYWORDS`).
+
 ---
 
-## 파이프라인 단계별 데이터 흐름
+## 데이터 흐름
 
-### Step 1 — 라인 아트 변환
-
-| 항목 | 내용 |
-|------|------|
-| **입력 이미지** | `images/step1/` 내 신발 측면 원본 사진 |
-| **선택 방식** | 실행 시 콘솔에서 번호 입력 선택 (단일·복수·`all` 지원) |
-| **프롬프트** | 원본 사진을 정밀하게 라인 아트로 재현 (흰 내부, 검은 윤곽선, 글자 포함) |
-| **API 입력** | `[원본_이미지, 프롬프트]` |
-| **출력** | 흑백 선화 이미지 + 텍스트 응답 |
-| **부가 효과** | 선택한 파일명 → `run_label` (출력 폴더명) 및 `model_name` 자동 결정 |
-
-### Step 2 — 2D 패턴 전개
+### 패턴 펼치기 (단일 스텝)
 
 | 항목 | 내용 |
 |------|------|
-| **입력 이미지** | `images/step2/{model_name}/` 내 어퍼 실루엣 가이드라인 이미지 |
-| **이전 이미지** | ⚠️ Step 1 생성 이미지는 **포함하지 않음** (가이드라인 이미지만 사용) |
-| **이전 텍스트** | ⚠️ **포함하지 않음** |
-| **채팅 맥락** | Step 1 대화 히스토리는 세션에 유지됨 |
-| **프롬프트** | 어퍼를 3D→2D로 전개, 가이드라인 실루엣에 밀착, 흑백, 재봉선 점선 표현 |
-| **API 입력** | `[가이드라인_이미지, 프롬프트]` |
+| **주 입력 이미지** | `images/` 안에서 고른 신발 실물 사진(사이드뷰) |
+| **가이드라인 이미지** | `images/` 안에서 이름으로 찾은 2D 펼침 가이드라인(틀) |
+| **선택 방식** | 실행 시 콘솔에서 이미지 번호 입력 (`all` 입력 시 전부 순서대로 실행) |
+| **프롬프트** | Upper를 3D→2D로 전개, 가이드라인에 빈틈없이 밀착, 흑백 라인 아트 |
+| **API 입력** | `[실물_사이드뷰_사진, 가이드라인_이미지, 프롬프트]` |
 | **출력** | 2D 전개 패턴 이미지 + 텍스트 응답 |
+| **부가 효과** | 선택한 파일명 → `run_label`(출력 폴더명) |
 
-### Step 3 — 시접 가이드라인 추가
+### Step 2 — 라인 아트 변환
 
 | 항목 | 내용 |
 |------|------|
-| **입력 이미지** | `images/step3/{model_name}/` 내 시접 여분 가이드라인 이미지 |
-| **이전 이미지** | ✅ Step 2에서 생성된 패턴 이미지 **포함** |
-| **이전 텍스트** | ✅ Step 1·2 텍스트 응답 **포함** |
-| **프롬프트** | 패턴을 가이드라인(시접 라인) 끝까지 확장, 흑백 |
-| **API 입력** | `[Step2_생성_이미지, 가이드라인_이미지, 이전_텍스트_응답, 프롬프트]` |
-| **출력** | 시접 포함 최종 패턴 이미지 + 텍스트 응답 |
+| **입력** | Step 1이 생성한 패턴 이미지 + Step 1 텍스트 응답 |
+| **프롬프트** | 모든 선을 구분해 라인 아트로, 무늬까지 빠짐없이 정확히 |
+| **API 입력** | `[Step1_생성_이미지, 이전_텍스트, 프롬프트]` |
+| **출력** | 라인 아트 패턴 이미지 + 텍스트 응답 |
 
 ---
 
-## 설치 및 실행
+## 빠른 시작
+
+```bash
+git clone <repo>
+cd Lateral-To-Pattern
+./run.sh
+```
+
+`run.sh`가 uv로 가상환경(`.venv`)과 의존성을 자동 구성한 뒤 파이프라인을 실행합니다.
+uv가 없으면 설치 여부를 물어봅니다. API 키나 입력 이미지가 없으면 실행 전에 알려줍니다.
+`main.py` 인자는 그대로 전달됩니다 — 예: `./run.sh --verbose`
+
+---
+
+## 설치 및 실행 (수동)
 
 ### 1. 의존성 설치
 
 ```bash
+uv sync            # 권장 (pyproject.toml + uv.lock 기준)
+# 또는
 pip install -r requirements.txt
 ```
 
@@ -117,32 +126,38 @@ pip install -r requirements.txt
 # 방법 A: 파일로 저장 (권장)
 echo "your_api_key" > config/APIkey
 
-# 방법 B: 환경변수
+# 방법 B: 레포 밖 키 파일 경로 지정
+export GEMINI_API_KEY_FILE=~/Documents/geminiapi.txt
+
+# 방법 C: 환경변수
 export GEMINI_API_KEY=your_api_key
 
-# 방법 C: 프로젝트 루트에 .env 파일
+# 방법 D: 프로젝트 루트에 .env 파일
 echo "GEMINI_API_KEY=your_api_key" > .env
 ```
+
+위 설정이 하나도 없으면 `config/api_config.py`의 `EXTERNAL_KEY_FILES`에 적힌
+기본 경로(`~/Documents/geminiapi.txt`)에서 키를 읽습니다. 키 값은 로그에 남지 않고,
+어느 경로에서 읽었는지만 출력됩니다.
 
 ### 3. 이미지 배치
 
 ```
-images/step1/            ← 신발 측면 사진 (PNG/JPG 등)
-images/step2/{모델명}/   ← 어퍼 실루엣 가이드라인
-images/step3/{모델명}/   ← 시접 가이드라인
+images/가이드라인.jpg      ← 2D 펼침 가이드라인(틀). 파일명에 '가이드라인' 포함
+images/나이키 탄준.jpg     ← 신발 실물 사이드뷰. 여러 장 넣으면 실행 시 선택
+images/뉴발란스 992.png
 ```
 
 ### 4. 실행
 
 ```bash
-# 기본 실행 (Step 1에서 이미지 선택)
-python main.py
+# 기본 실행 (콘솔에서 모델 폴더 선택)
+./run.sh
+# 또는
+uv run python main.py
 
-# 특정 이미지 지정
-python main.py --step1-image images/step1/nike.png
-
-# 특정 단계부터 시작
-python main.py --start-step 2
+# 이미지 직접 지정 (선택 과정 건너뛰기)
+./run.sh --shoe-image "images/나이키 탄준.jpg" --guide-image "images/가이드라인.jpg"
 
 # 출력 폴더명 지정
 python main.py --run-label my_run
@@ -157,14 +172,12 @@ python main.py --verbose
 
 ```
 output/{모델명}/
-├── step_01_level_1_style_change.md      # Step 1 결과 (입력·프롬프트·응답)
-├── step_02_level_2_pattern_generation.md
-├── step_03_level_3_guideline_addition.md
-├── final_output.md                      # 최종 단계 응답 전문
-└── chat_history.json                    # 전체 채팅 히스토리 (JSON)
+├── step_01_pattern_unfold.md   # 입력·프롬프트·응답
+├── final_output.md             # 최종 응답 전문
+└── chat_history.json           # 전체 채팅 히스토리 (JSON)
 ```
 
-생성된 이미지는 각 단계 Markdown 파일과 동일한 폴더에 저장됩니다.
+생성된 이미지는 Markdown 파일과 동일한 폴더에 저장됩니다.
 
 ---
 
@@ -181,108 +194,3 @@ output/{모델명}/
 - `google-genai >= 1.0.0`
 - `Pillow >= 10.0.0`
 - `python-dotenv >= 1.0.0`
-
-멀티스텝 채팅 방식으로 Gemini API를 호출하는 이미지+프롬프트 파이프라인.
-
-```
-이미지 + 프롬프트 → Gemini → 이미지 + 프롬프트 → Gemini → 이미지 + 프롬프트 → Gemini → output 저장
-                   (채팅 히스토리 유지)          (채팅 히스토리 유지)
-```
-
-## 프로젝트 구조
-
-```
-Lateral-To-Pattern/
-├── main.py                    ← 실행 진입점
-├── requirements.txt
-├── .env.example               ← API 키 예시 (복사 후 .env로 이름 변경)
-│
-├── config/                    ← 설정 관리
-│   ├── api_config.py          ← API 키 로드 (.env에서 읽음)
-│   ├── gemini_config.py       ← 모델명, 생성 파라미터, 안전 설정
-│   └── prompts.py             ← 단계별 프롬프트 & 이미지 경로 정의
-│
-├── src/                       ← 핵심 로직
-│   ├── gemini_client.py       ← Gemini API 채팅 클라이언트 (재시도 포함)
-│   ├── image_handler.py       ← 이미지 로드 & parts 구성
-│   └── pipeline.py            ← 멀티스텝 파이프라인 오케스트레이터
-│
-├── utils/
-│   └── output_handler.py      ← 단계별 결과 & 최종 출력 파일 저장
-│
-├── images/                    ← 단계별 입력 이미지
-│   ├── step1/input.png
-│   ├── step2/input.png
-│   └── step3/input.png
-│
-└── output/                    ← 실행 결과 (실행마다 타임스탬프 폴더 생성)
-    └── 20240101_120000/
-        ├── step_01_initial_analysis.md
-        ├── step_02_lateral_pattern_extraction.md
-        ├── step_03_final_synthesis.md
-        ├── final_output.md
-        └── chat_history.json
-```
-
-## 시작하기
-
-### 1. 의존성 설치
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. API 키 설정
-
-```bash
-cp .env.example .env
-# .env 파일에서 GEMINI_API_KEY 값을 실제 키로 교체
-```
-
-또는 `config/APIkey` 파일에 API 키 문자열만 넣어 저장하면 해당 파일을 우선적으로 사용합니다 (파일은 .gitignore에 등록되어 있습니다).
-
-### 3. 이미지 배치
-
-각 단계에 사용할 이미지를 해당 폴더에 저장:
-```
-images/step1/input.png
-images/step2/input.png
-images/step3/input.png
-```
-
-### 4. 프롬프트 커스터마이징 (선택)
-
-`config/prompts.py`에서 각 단계의 프롬프트와 이미지 경로를 수정합니다.
-
-### 5. 실행
-
-```bash
-# 기본 실행
-python main.py
-
-# CLI로 이미지 경로 직접 지정
-python main.py --step1-image path/to/img1.png --step2-image path/to/img2.png --step3-image path/to/img3.png
-
-# 실행 레이블 지정 (output 폴더명)
-python main.py --run-label experiment_01
-
-# 상세 로그 출력
-python main.py --verbose
-```
-
-## 설정 파일 설명
-
-| 파일 | 역할 |
-|------|------|
-| `.env` | API 키 (Git 업로드 금지) |
-| `config/api_config.py` | API 키 로드 로직 |
-| `config/gemini_config.py` | 모델, 온도, 토큰 수 등 생성 파라미터 |
-| `config/prompts.py` | 단계별 프롬프트 & 이미지 경로 |
-
-## 결과물
-
-실행 후 `output/{run_label}/` 폴더에 저장됩니다:
-
-- `step_01_*.md` ~ `step_03_*.md`: 각 단계의 프롬프트 + 응답
-- `final_output.md`: 최종(마지막 단계) 응답
-- `chat_history.json`: 전체 채팅 히스토리 (JSON)

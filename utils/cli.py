@@ -13,7 +13,7 @@ from pathlib import Path
 def build_parser() -> argparse.ArgumentParser:
     """CLI 인자 파서를 구성합니다."""
     parser = argparse.ArgumentParser(
-        description="Lateral-To-Pattern: 멀티스텝 Gemini 이미지+프롬프트 파이프라인"
+        description="Lateral-To-Pattern: 신발 실물 사이드뷰 사진을 2D 패턴으로 펼치는 Gemini 파이프라인"
     )
     parser.add_argument(
         "--run-label",
@@ -26,25 +26,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="결과를 저장할 최상위 디렉터리 (기본값: output/)",
     )
     parser.add_argument(
-        "--start-step",
-        type=int,
-        default=1,
-        help="어떤 단계부터 실행할지 지정 (기본값: 1)",
+        "--shoe-image",
+        default=None,
+        help="신발 실물 사진(사이드뷰) 경로 또는 폴더 (미입력 시 config/prompts.py 설정 사용)",
     )
     parser.add_argument(
-        "--step1-image",
+        "--guide-image",
         default=None,
-        help="Step 1에서 사용할 이미지 경로 (미입력 시 config/prompts.py 설정 사용)",
-    )
-    parser.add_argument(
-        "--step2-image",
-        default=None,
-        help="Step 2에서 사용할 이미지 경로 (미입력 시 config/prompts.py 설정 사용)",
-    )
-    parser.add_argument(
-        "--step3-image",
-        default=None,
-        help="Step 3에서 사용할 이미지 경로 (미입력 시 config/prompts.py 설정 사용)",
+        help="2D 펼침 가이드라인(틀) 이미지 경로 또는 폴더 (미입력 시 config/prompts.py 설정 사용)",
     )
     parser.add_argument(
         "--verbose", "-v",
@@ -54,13 +43,19 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def apply_image_overrides(steps: list[dict], overrides: dict[int, str]) -> list[dict]:
-    """CLI 인자로 전달된 이미지 경로를 단계 설정에 덮어씁니다."""
-    updated = []
-    for step_config in steps:
-        cfg = dict(step_config)
-        step_num = cfg["step"]
-        if step_num in overrides and overrides[step_num]:
-            cfg["image_path"] = Path(overrides[step_num])
-        updated.append(cfg)
+def apply_image_overrides(
+    steps: list[dict],
+    shoe_image: str | None = None,
+    guide_image: str | None = None,
+) -> list[dict]:
+    """CLI 인자로 전달된 이미지 경로를 첫 단계 설정에 덮어씁니다."""
+    updated = [dict(step_config) for step_config in steps]
+    if not updated:
+        return updated
+
+    if shoe_image:
+        updated[0]["image_path"] = Path(shoe_image)
+    if guide_image:
+        updated[0]["guide_image_path"] = Path(guide_image)
+
     return updated
