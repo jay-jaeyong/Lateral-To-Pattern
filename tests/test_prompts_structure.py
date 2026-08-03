@@ -212,6 +212,34 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("통일은 같은 부품의 반복 조각에만 적용해", survey)
         self.assertIn("서로 다른 부품끼리는 통일하지 마", survey)
 
+    def test_survey_asks_whether_a_seam_is_sewn_at_all(self):
+        """'부품 경계마다 실이 몇 줄'은 모든 경계에 봉제가 있다고 전제해 버립니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("접합 방식", survey)
+        self.assertIn("열접착·본딩(무봉제)", survey)
+        self.assertIn("실이 눈에 보이지 않으면 재봉이 아니야", survey)
+
+    def test_survey_sweeps_relief_beyond_logos(self):
+        """음각을 로고 예시와만 묶어두면 반복 문양과 홈을 놓칩니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("음각(파인 것)과 양각(솟은 것)", survey)
+        self.assertIn("반복 문양·리브·홈·슬롯·격자", survey)
+        self.assertIn("개수를 세서 적어", survey)
+
+    def test_survey_anchors_parts_to_landmarks(self):
+        """랜드마크 없이 '측면 하단'만 적으면 펼치기가 부품을 옮겨버립니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        for landmark in ("미드솔 라인", "앞코 끝", "뒤꿈치 중심", "아일릿 줄"):
+            self.assertIn(landmark, survey, msg=landmark)
+        self.assertIn("랜드마크 없는 서술만 적지 마", survey)
+
+    def test_unfold_honours_bonding_and_landmarks(self):
+        """무봉제 경계에 스티치를 그리거나 부품을 옮기면 소재와 위치가 틀립니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("무봉제", unfold)
+        self.assertIn("스티치를 그리지 마", unfold)
+        self.assertIn("랜드마크 위치에 놓아", unfold)
+
 
 if __name__ == "__main__":
     unittest.main()
