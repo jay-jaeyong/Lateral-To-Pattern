@@ -25,6 +25,7 @@ from services.gemini_client import GeminiClient
 from handlers.image_handler import ImageHandler
 from handlers.output_handler import OutputHandler
 from utils.logging_utils import step_context
+from utils.cli import resolve_run_label_from_path
 from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
@@ -147,16 +148,18 @@ class Pipeline:
         return resolved
 
     def _run_for_each(self, targets: list[Path], pipeline_result: PipelineResult) -> PipelineResult:
-        """선택된 모델 폴더마다 파이프라인을 개별 실행합니다('all' 선택)."""
+        """선택된 모델 폴더마다 파이프라인을 개별 실행합니다('all' 선택 또는 --shoe-image 배치)."""
         base_output_dir = self._output_handler._run_dir.parent
         for target in targets:
             per_steps = [dict(s) for s in self._steps]
             # 첫 스텝의 image_path를 해당 모델 폴더로 고정
             per_steps[0]["image_path"] = Path(target)
+            # 경로 stem이 뷰 플래그 이름이면 부모 폴더명을 사용합니다.
+            label = resolve_run_label_from_path(Path(target))
             per_pipeline = Pipeline(
                 steps=per_steps,
                 output_dir=base_output_dir,
-                run_label=Path(target).stem,
+                run_label=label,
             )
             try:
                 sub_result = per_pipeline.run(skip_initial_selection=True)

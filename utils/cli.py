@@ -70,7 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """인자를 파싱하고 뷰 플래그 경로가 실제로 있는지 검사합니다.
+    """인자를 파싱하고 모든 경로가 실제로 있는지 검사합니다.
 
     없는 파일을 가리키면 API를 부르기 전에 여기서 종료합니다.
     """
@@ -81,6 +81,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         value = getattr(args, name, None)
         if value and not Path(value).is_file():
             parser.error(f"--{name} 경로를 찾을 수 없습니다: {value}")
+
+    if args.shoe_image:
+        for path_str in args.shoe_image:
+            if not Path(path_str).exists():
+                parser.error(f"--shoe-image 경로를 찾을 수 없습니다: {path_str}")
+
+    if args.guide_image and not Path(args.guide_image).exists():
+        parser.error(f"--guide-image 경로를 찾을 수 없습니다: {args.guide_image}")
 
     return args
 
@@ -95,12 +103,30 @@ def collect_view_images(args: argparse.Namespace) -> list[tuple[str, Path]]:
     return collected
 
 
+def resolve_run_label_from_path(path: Path) -> str:
+    """경로의 stem이 뷰 플래그 이름이면 부모 디렉터리 이름을 반환합니다.
+
+    images/nike_v2k_run_opp1/lateral.webp → 'nike_v2k_run_opp1' (lateral 무시)
+    images/nike.webp → 'nike' (뷰 플래그 아님)
+    """
+    stem = path.stem
+    flag_names = {name for name, _ in VIEW_FLAGS}
+    if stem.lower() in flag_names:
+        # stem이 뷰 플래그 이름이면 부모 디렉터리 이름 사용
+        parent_name = path.parent.name
+        if parent_name:
+            return parent_name
+    return stem
+
+
 def derive_run_label(view_images: list[tuple[str, Path]]) -> str | None:
     """뷰 플래그 목록에서 출력 폴더 이름을 유도합니다.
 
-    VIEW_FLAGS 순서상 lateral이 맨 앞이므로, lateral이 있으면 그 파일명이 됩니다.
+    경로의 파일명이 뷰 플래그 이름이면 부모 폴더명을 사용합니다.
     """
-    return view_images[0][1].stem if view_images else None
+    if not view_images:
+        return None
+    return resolve_run_label_from_path(view_images[0][1])
 
 
 def apply_image_overrides(
