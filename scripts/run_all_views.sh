@@ -33,6 +33,12 @@ for model_dir in $models; do
         continue
     fi
 
+    # 이미 3스텝까지 끝난 모델은 건너뜁니다. 다시 돌리려면 해당 output 폴더를 지우세요.
+    if compgen -G "output/$model/step_03_*_generated_*.png" > /dev/null; then
+        echo "SKIP  [$index/$total] $model — 이미 완료됨"
+        continue
+    fi
+
     echo "START [$index/$total] $model — 뷰 $(( ${#args[@]} / 2 ))장"
     if ./run.sh "${args[@]}" > "$LOG_DIR/$model.log" 2>&1; then
         echo "OK    [$index/$total] $model"

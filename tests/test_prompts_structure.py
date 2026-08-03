@@ -56,8 +56,8 @@ class PromptContentTest(unittest.TestCase):
         expected = [
             "priority", "input", "multiview_rule", "reconstruct_rule", "pair_rule",
             "task", "fit_rule", "exclude", "heel_rule", "part_rule", "flat_rule",
-            "task_rule", "guideline_rule", "outline_rule", "empty_rule",
-            "background_rule", "caution",
+            "task_rule", "lighting_rule", "guideline_rule", "outline_rule",
+            "empty_rule", "background_rule", "caution",
         ]
         found = re.findall(r'"([a-z_]+)": \[', PIPELINE_STEPS[1]["prompt"])
         self.assertEqual(found, expected)
@@ -81,6 +81,31 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("원단이 실제로 없는 자리", unfold)
         for place in ("TONGUE(설포)", "throat", "Heel 절개"):
             self.assertIn(place, unfold)
+
+    def test_survey_judges_material_by_optics_not_by_name(self):
+        """부품 이름으로 재질을 추측하면 브랜드 관행이 실물을 덮어씁니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn('"material_rule"', survey)
+        self.assertIn("광학적 특징으로 판정", survey)
+        self.assertIn("정반사 하이라이트", survey)
+
+    def test_survey_treats_uneven_brightness_as_lighting(self):
+        """같은 부품의 조각별 밝기 차이를 재질 차이로 읽으면 삼선이 갈립니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("재질을 한 번만 판정하고 전부 같게", survey)
+        self.assertIn("조명 차이", survey)
+
+    def test_unfold_renders_under_uniform_light(self):
+        """원본 하이라이트를 옮기면 조명 얼룩이 소재 차이처럼 보입니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn('"lighting_rule"', unfold)
+        self.assertIn("균일한 확산광", unfold)
+        self.assertIn("하이라이트 위치를 그대로 옮기지 마", unfold)
+        self.assertIn("같은 광택으로 그려", unfold)
+
+    def test_line_art_does_not_outline_highlights(self):
+        """광택 경계를 부품 경계로 착각하면 없는 재단선이 생깁니다."""
+        self.assertIn("하이라이트 경계를 부품 경계로 착각", PIPELINE_STEPS[2]["prompt"])
 
     def test_survey_splits_unconfirmed_into_two_kinds(self):
         """면 전체 미확인과 개별 특징 미확인을 구분해야 복원 판단이 됩니다."""
