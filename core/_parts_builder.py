@@ -99,8 +99,8 @@ def _insert_guide_images(parts: list, guide_image_path: Path | str | None) -> li
 def _load_guide_images(guide_path: Path) -> list:
     """가이드라인 경로(파일 또는 폴더)에서 이미지를 로드합니다.
 
-    폴더라면 파일명에 '가이드라인'(또는 guideline) 키워드가 들어간 이미지를 먼저 찾고,
-    없으면 폴더 안의 이미지를 전부 사용합니다.
+    폴더라면 파일명에 '가이드라인'(또는 guideline) 키워드가 들어간 이미지를 찾습니다.
+    없으면 빈 리스트를 반환합니다 (임의의 신발 사진을 가이드라인으로 사용하는 것을 방지).
     """
     if guide_path.is_file():
         return [ImageHandler.load(guide_path)]
@@ -111,17 +111,11 @@ def _load_guide_images(guide_path: Path) -> list:
             return [ImageHandler.load(found)]
 
         logger.warning(
-            "'%s'에서 가이드라인 키워드(%s)가 들어간 파일을 찾지 못했습니다 — 폴더 내 이미지를 사용합니다.",
+            "'%s'에서 가이드라인 키워드(%s)가 들어간 파일을 찾지 못했습니다.",
             guide_path,
             ", ".join(ImageHandler.GUIDELINE_KEYWORDS),
         )
-        images = []
-        for f in ImageHandler.list_image_files(guide_path):
-            try:
-                images.append(ImageHandler.load(f))
-            except Exception as exc:
-                logger.warning("가이드라인 이미지 로드 실패: %s — %s", f, exc)
-        return images
+        return []
 
     return []
 

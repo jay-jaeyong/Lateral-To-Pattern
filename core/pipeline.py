@@ -129,6 +129,7 @@ class Pipeline:
         """모델명이 정해졌다면 이미지 경로를 해당 모델 서브폴더로 좁힙니다.
 
         첫 스텝의 image_path는 이미 선택이 끝났으므로 건드리지 않습니다.
+        가이드라인은 모델 서브폴더에 실제로 있을 때만 좁힙니다.
         """
         if not model_name:
             return config
@@ -139,11 +140,13 @@ class Pipeline:
             resolved["image_path"] = self._resolve_model_subdir(Path(config["image_path"]), model_name)
 
         if config.get("guide_image_path") is not None:
-            # 모델명과 같은 이름의 서브폴더가 있으면 그 안에서, 없으면 원래 폴더에서
-            # 가이드라인 파일을 찾습니다(파일명 키워드로 탐색).
-            resolved["guide_image_path"] = self._resolve_model_subdir(
-                Path(config["guide_image_path"]), model_name, fallback_to_first=False
-            )
+            # 모델 서브폴더에서 가이드라인을 찾아봅니다.
+            base_guide_path = Path(config["guide_image_path"])
+            model_subdir = self._resolve_model_subdir(base_guide_path, model_name, fallback_to_first=False)
+            # 모델 서브폴더에 실제로 가이드라인이 있으면 그것을 사용하고, 없으면 원래 경로를 유지합니다.
+            if model_subdir != base_guide_path and ImageHandler.find_guideline(model_subdir):
+                resolved["guide_image_path"] = model_subdir
+            # 원래 경로도 확인 (없으면 그대로)
 
         return resolved
 
