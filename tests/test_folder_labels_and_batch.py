@@ -37,13 +37,16 @@ class LabelImageFilesTest(unittest.TestCase):
             [LABELS["lateral"], LABELS["front"], LABELS["top"]],
         )
 
-    def test_quarter_labels_are_used_for_front_and_heel(self):
+    def test_front_and_heel_labels_do_not_assert_a_quarter_angle(self):
+        # front/heel 사진은 정면일 수도 쿼터일 수도 있으므로 라벨이 각도를 단정하면 안 됩니다.
         labeled = dict(
             (p.stem, label)
             for label, p in label_image_files([Path("front.webp"), Path("heel.webp")])
         )
-        self.assertEqual(labeled["front"], "쿼터 프론트 뷰(quarter front)")
-        self.assertEqual(labeled["heel"], "쿼터 힐 뷰(quarter heel)")
+        self.assertEqual(labeled["front"], "앞쪽에서 본 모습(front)")
+        self.assertEqual(labeled["heel"], "뒤쪽에서 본 모습(heel)")
+        for label in labeled.values():
+            self.assertNotIn("쿼터", label)
 
     def test_matching_is_case_insensitive(self):
         labeled = label_image_files([Path("LATERAL.WEBP")])

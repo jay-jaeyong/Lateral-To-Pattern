@@ -17,8 +17,8 @@
 - 뷰 라벨 문자열은 정확히 다음과 같다. 프롬프트가 이 문자열을 그대로 지칭하므로 한 글자도 바꾸지 않는다.
   - `바깥쪽 측면(lateral)`
   - `안쪽 측면(medial)`
-  - `쿼터 프론트 뷰(quarter front)`
-  - `쿼터 힐 뷰(quarter heel)`
+  - `앞쪽에서 본 모습(front)`
+  - `뒤쪽에서 본 모습(heel)`
   - `위에서 본 모습(top)`
   - `바닥(bottom)`
 - 이미지 앞에 붙는 라벨 파트의 형식은 `[사진 {index}] {label}`이다. index는 1부터 시작하고, 실제로 로드에 성공한 이미지만 센다.
@@ -106,8 +106,8 @@ class ViewFlagOrderTest(unittest.TestCase):
         labels = dict(VIEW_FLAGS)
         self.assertEqual(labels["lateral"], "바깥쪽 측면(lateral)")
         self.assertEqual(labels["medial"], "안쪽 측면(medial)")
-        self.assertEqual(labels["front"], "쿼터 프론트 뷰(quarter front)")
-        self.assertEqual(labels["heel"], "쿼터 힐 뷰(quarter heel)")
+        self.assertEqual(labels["front"], "앞쪽에서 본 모습(front)")
+        self.assertEqual(labels["heel"], "뒤쪽에서 본 모습(heel)")
         self.assertEqual(labels["top"], "위에서 본 모습(top)")
         self.assertEqual(labels["bottom"], "바닥(bottom)")
 
@@ -220,8 +220,8 @@ logger = logging.getLogger(__name__)
 VIEW_FLAGS: tuple[tuple[str, str], ...] = (
     ("lateral", "바깥쪽 측면(lateral)"),
     ("medial", "안쪽 측면(medial)"),
-    ("front", "쿼터 프론트 뷰(quarter front)"),
-    ("heel", "쿼터 힐 뷰(quarter heel)"),
+    ("front", "앞쪽에서 본 모습(front)"),
+    ("heel", "뒤쪽에서 본 모습(heel)"),
     ("top", "위에서 본 모습(top)"),
     ("bottom", "바닥(bottom)"),
 )

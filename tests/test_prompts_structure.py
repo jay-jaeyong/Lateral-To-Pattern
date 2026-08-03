@@ -57,26 +57,41 @@ class PromptContentTest(unittest.TestCase):
         for name in ("lateral", "medial", "top", "front", "heel"):
             self.assertIn(labels[name], unfold, msg=name)
 
-    def test_survey_names_the_quarter_labels_exactly(self):
-        """쿼터 뷰 설명은 관찰 스텝에도 있고, 거기서도 라벨이 정확해야 합니다."""
+    def test_survey_names_the_front_and_heel_labels_exactly(self):
+        """front/heel 각도 설명은 관찰 스텝에도 있고, 거기서도 라벨이 정확해야 합니다."""
         labels = dict(VIEW_FLAGS)
         survey = PIPELINE_STEPS[0]["prompt"]
         for name in ("front", "heel"):
             self.assertIn(labels[name], survey, msg=name)
 
-    def test_quarter_labels_are_never_written_without_the_parenthetical(self):
-        """'쿼터 프론트 뷰'만 쓰고 '(quarter front)'를 빼면 라벨과 어긋납니다."""
-        labels = dict(VIEW_FLAGS)
+    def test_labels_are_never_written_without_the_parenthetical(self):
+        """'앞쪽에서 본 모습'만 쓰고 '(front)'를 빼면 라벨과 어긋납니다.
+
+        괄호 없는 표기는 산문으로 읽혀서 어느 사진을 가리키는지 모호해집니다.
+        신발 부위를 뜻하는 말은 라벨과 겹치지 않는 표현('안쪽면' 등)을 씁니다.
+        """
         for step in PIPELINE_STEPS:
             prompt = step["prompt"]
-            for name in ("front", "heel"):
-                full = labels[name]
+            for _name, full in VIEW_FLAGS:
                 bare = full.split("(")[0]
                 self.assertEqual(
                     prompt.count(bare),
                     prompt.count(full),
                     msg=f"{step['name']}: '{bare}'가 '{full}' 밖에서 쓰였습니다",
                 )
+
+    def test_front_and_heel_angle_is_not_asserted(self):
+        """front/heel은 정면일 수도 쿼터일 수도 있으므로 프롬프트가 단정하면 안 됩니다."""
+        for index in (0, 1):
+            prompt = PIPELINE_STEPS[index]["prompt"]
+            self.assertIn("쿼터", prompt, msg=PIPELINE_STEPS[index]["name"])
+            self.assertIn("사진을 보고", prompt, msg=PIPELINE_STEPS[index]["name"])
+
+    def test_both_prompts_handle_a_pair_in_one_photo(self):
+        """한 켤레가 같이 찍힌 사진에서 두 짝을 섞지 않도록 규칙이 있어야 합니다."""
+        for index in (0, 1):
+            self.assertIn('"pair_rule"', PIPELINE_STEPS[index]["prompt"],
+                          msg=PIPELINE_STEPS[index]["name"])
 
     def test_survey_demands_unconfirmed_list(self):
         survey = PIPELINE_STEPS[0]["prompt"]

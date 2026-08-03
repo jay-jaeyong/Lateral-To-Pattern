@@ -26,8 +26,8 @@ class ViewFlagOrderTest(unittest.TestCase):
         labels = dict(VIEW_FLAGS)
         self.assertEqual(labels["lateral"], "바깥쪽 측면(lateral)")
         self.assertEqual(labels["medial"], "안쪽 측면(medial)")
-        self.assertEqual(labels["front"], "쿼터 프론트 뷰(quarter front)")
-        self.assertEqual(labels["heel"], "쿼터 힐 뷰(quarter heel)")
+        self.assertEqual(labels["front"], "앞쪽에서 본 모습(front)")
+        self.assertEqual(labels["heel"], "뒤쪽에서 본 모습(heel)")
         self.assertEqual(labels["top"], "위에서 본 모습(top)")
         self.assertEqual(labels["bottom"], "바닥(bottom)")
 

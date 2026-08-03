@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 VIEW_FLAGS: tuple[tuple[str, str], ...] = (
     ("lateral", "바깥쪽 측면(lateral)"),
     ("medial", "안쪽 측면(medial)"),
-    ("front", "쿼터 프론트 뷰(quarter front)"),
-    ("heel", "쿼터 힐 뷰(quarter heel)"),
+    ("front", "앞쪽에서 본 모습(front)"),
+    ("heel", "뒤쪽에서 본 모습(heel)"),
     ("top", "위에서 본 모습(top)"),
     ("bottom", "바닥(bottom)"),
 )
