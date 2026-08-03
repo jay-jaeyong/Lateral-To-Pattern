@@ -29,6 +29,7 @@ def build_step_parts(
     prebuilt_parts: list | None = None,
     guide_image_path: Path | str | None = None,
     max_images: int | None = None,
+    view_images: list[tuple[str, Path]] | None = None,
 ) -> list:
     """각 단계별 parts 리스트를 조립하여 반환합니다.
 
@@ -41,9 +42,16 @@ def build_step_parts(
         prebuilt_parts  : 이미 조립된 parts (첫 스텝 사전 선택 시 재사용)
         guide_image_path: 가이드라인(틀) 이미지 경로 (None 가능)
         max_images      : 폴더에서 불러올 이미지 최대 장수 (None이면 전부)
+        view_images     : (라벨, 경로) 목록. 주어지면 image_path 대신 이것을 쓴다
     """
     # ── 1. 현재 단계의 주 입력 이미지 + 프롬프트 로드 ──────────────────
-    parts = list(prebuilt_parts) if prebuilt_parts is not None else _load_images(prompt, image_path, max_images)
+    if prebuilt_parts is not None:
+        parts = list(prebuilt_parts)
+    elif view_images:
+        # 뷰 플래그로 받은 사진이 있으면 image_path는 무시합니다.
+        parts = ImageHandler.build_labeled_parts(view_images, prompt)
+    else:
+        parts = _load_images(prompt, image_path, max_images)
 
     # ── 2. 가이드라인 이미지를 프롬프트 바로 앞에 삽입 ─────────────────
     parts = _insert_guide_images(parts, guide_image_path)

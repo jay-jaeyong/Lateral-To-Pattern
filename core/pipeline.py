@@ -41,6 +41,7 @@ class Pipeline:
         steps: list[dict] | None = None,
         output_dir: Path | str = Path("output"),
         run_label: str | None = None,
+        batch_targets: list[Path] | None = None,
     ) -> None:
         """
         Args:
@@ -48,8 +49,11 @@ class Pipeline:
                    None이면 config/prompts.py의 PIPELINE_STEPS 사용.
             output_dir: 결과 파일을 저장할 디렉터리.
             run_label: 실행 식별자 (출력 파일명에 사용). None이면 타임스탬프 자동 생성.
+            batch_targets: 신발 이미지(또는 모델 폴더) 목록. 주어지면 각 항목마다
+                           파이프라인을 개별 실행합니다.
         """
         self._steps = steps or PIPELINE_STEPS
+        self._batch_targets = batch_targets
         self._client = GeminiClient()
         self._output_handler = OutputHandler(
             output_dir=Path(output_dir),
@@ -172,6 +176,12 @@ class Pipeline:
         self._client.start_chat()
 
         pipeline_result = PipelineResult()
+
+        # --- 신발 이미지를 여러 개 받았다면 하나씩 개별 실행 ---
+        if self._batch_targets and not skip_initial_selection:
+            logger.info("신발 이미지 %d개를 개별 실행합니다", len(self._batch_targets))
+            return self._run_for_each(self._batch_targets, pipeline_result)
+
         # 누적된 이전 단계의 텍스트 응답 및 생성 이미지를 보관합니다
         previous_texts: list[str] = []
         previous_images: list = []
@@ -251,6 +261,7 @@ class Pipeline:
         prompt = config["prompt"]
         image_path = config.get("image_path")
         guide_image_path = config.get("guide_image_path")
+        view_images = config.get("view_images")
         should_save = config.get("save_output", True)
 
         with step_context(step_num):
@@ -267,6 +278,7 @@ class Pipeline:
                     prebuilt_parts=prebuilt_parts,
                     guide_image_path=guide_image_path,
                     max_images=config.get("max_images"),
+                    view_images=view_images,
                 )
             except Exception:
                 logger.exception("parts 조립 실패 — 프롬프트만으로 진행합니다.")

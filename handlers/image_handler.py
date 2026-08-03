@@ -28,6 +28,10 @@ class ImageHandler:
     # 파일명에 이 키워드가 들어 있으면 가이드라인(틀) 이미지로 봅니다.
     GUIDELINE_KEYWORDS = ("가이드라인", "가이드", "guideline", "guide")
 
+    # 이미지 앞에 붙는 라벨 텍스트 파트의 형식.
+    # Pillow가 로드할 때 파일명을 버리므로, 어느 각도 사진인지는 이 라벨로만 전달됩니다.
+    LABEL_FORMAT = "[사진 {index}] {label}"
+
     # ──────────────────────────────────────────────────
     # 파일 탐색
     # ──────────────────────────────────────────────────
@@ -156,6 +160,37 @@ class ImageHandler:
 
         return [prompt]
 
+    @staticmethod
+    def build_labeled_parts(labeled_paths: list[tuple[str, Path]], prompt: str) -> list:
+        """(라벨, 경로) 목록을 [라벨, 이미지, ..., 프롬프트] 파트로 조립합니다.
+
+        Args:
+            labeled_paths: (라벨 문자열, 이미지 경로) 튜플 목록. 목록 순서가 전송 순서입니다.
+            prompt: 맨 뒤에 붙일 텍스트 프롬프트.
+
+        Returns:
+            Gemini API에 전달할 parts 리스트.
+            로드 가능한 이미지가 하나도 없으면 [prompt]만 반환합니다.
+        """
+        parts: list = []
+        index = 1
+        for label, path in labeled_paths:
+            try:
+                image = ImageHandler.load(path)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("이미지 로드 실패: %s — %s", path, exc)
+                continue
+            parts.append(ImageHandler.LABEL_FORMAT.format(index=index, label=label))
+            parts.append(image)
+            index += 1
+
+        if not parts:
+            logger.info("로드된 이미지가 없습니다 — 프롬프트만으로 진행합니다.")
+            return [prompt]
+
+        parts.append(prompt)
+        return parts
+
     # ──────────────────────────────────────────────────
     # 내부 헬퍼
     # ──────────────────────────────────────────────────
@@ -214,16 +249,10 @@ class ImageHandler:
             )
             image_files = image_files[:max_images]
 
-        images: list[Image.Image] = []
-        for f in image_files:
-            try:
-                images.append(ImageHandler.load(f))
-            except Exception as exc:
-                logger.warning("이미지 로드 실패: %s — %s", f, exc)
-
-        if not images:
-            logger.info("로드된 이미지 없음: %s — 프롬프트만으로 진행합니다.", folder)
-            return [prompt]
-
-        logger.info("폴더 '%s'에서 이미지 %d장 로드 완료", folder.name, len(images))
-        return [*images, prompt]
+        # 폴더 방식은 뷰 종류를 알 수 없으므로 파일명을 라벨로 넘겨 모델이 판단하게 합니다.
+        parts = ImageHandler.build_labeled_parts(
+            [(f"파일명: {f.stem}", f) for f in image_files], prompt
+        )
+        loaded = (len(parts) - 1) // 2
+        logger.info("폴더 '%s'에서 이미지 %d장 로드 완료", folder.name, loaded)
+        return parts
