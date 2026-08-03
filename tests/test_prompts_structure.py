@@ -240,6 +240,14 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("스티치를 그리지 마", unfold)
         self.assertIn("랜드마크 위치에 놓아", unfold)
 
+    def test_survey_requires_a_relief_field_for_every_part(self):
+        """저대비 훑기로만 두면 색이 있는 부품의 뚜렷한 홈을 건너뜁니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("표면 요철", survey)
+        self.assertIn("부품마다 빠짐없이 적어야 하는 필수 항목", survey)
+        self.assertIn("없으면 '없음'이라고 적어", survey)
+        self.assertIn("모든 부품에 '표면 요철' 항목이 채워져 있는지", survey)
+
 
 if __name__ == "__main__":
     unittest.main()
