@@ -114,6 +114,46 @@ class BuildStepPartsTest(unittest.TestCase):
         self.assertIsInstance(parts[0], Image.Image)
         self.assertEqual(parts[-1], "PROMPT")
 
+    def test_initial_references_precede_guide_and_previous_text(self):
+        reference = Image.new("RGB", (4, 4), "red")
+        guide = make_png(self.tmp / "guide.png")
+
+        parts = build_step_parts(
+            step_num=2,
+            prompt="PROMPT",
+            image_path=None,
+            prev_images=[],
+            prev_texts=["SPEC"],
+            guide_image_path=guide,
+            initial_reference_parts=["[사진 1] 바깥쪽 측면(lateral)", reference],
+        )
+
+        self.assertEqual(parts[0], "[사진 1] 바깥쪽 측면(lateral)")
+        self.assertIs(parts[1], reference)
+        self.assertEqual(parts[2], "[가이드라인]")
+        self.assertIsInstance(parts[3], Image.Image)
+        self.assertEqual(parts[4], "[Previous Step 1 Output]\nSPEC")
+        self.assertEqual(parts[5], "PROMPT")
+
+    def test_initial_reference_parts_are_copied_before_assembly(self):
+        reference = Image.new("RGB", (4, 4), "red")
+        initial_reference_parts = ["[사진 1] 바깥쪽 측면(lateral)", reference]
+
+        parts = build_step_parts(
+            step_num=2,
+            prompt="PROMPT",
+            image_path=None,
+            prev_images=[],
+            prev_texts=[],
+            initial_reference_parts=initial_reference_parts,
+        )
+
+        parts.pop(0)
+        self.assertEqual(
+            initial_reference_parts,
+            ["[사진 1] 바깥쪽 측면(lateral)", reference],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
