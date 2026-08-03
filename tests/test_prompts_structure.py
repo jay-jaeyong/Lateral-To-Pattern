@@ -54,6 +54,14 @@ class PromptContentTest(unittest.TestCase):
         lateral_label = dict(VIEW_FLAGS)["lateral"]
         self.assertIn(lateral_label, PIPELINE_STEPS[1]["prompt"])
 
+    def test_unfold_names_the_medial_label_exactly(self):
+        medial_label = dict(VIEW_FLAGS)["medial"]
+        self.assertIn(medial_label, PIPELINE_STEPS[1]["prompt"])
+
+    def test_unfold_names_the_top_label_exactly(self):
+        top_label = dict(VIEW_FLAGS)["top"]
+        self.assertIn(top_label, PIPELINE_STEPS[1]["prompt"])
+
     def test_survey_demands_unconfirmed_list(self):
         survey = PIPELINE_STEPS[0]["prompt"]
         self.assertIn("미확인", survey)
