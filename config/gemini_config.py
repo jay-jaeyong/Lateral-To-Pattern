@@ -21,13 +21,12 @@ MODEL_NAME = "gemini-3-pro-image"
 RESPONSE_MODALITIES = ["IMAGE"]
 
 # ─────────────────────────────────────────────
-# 출력 이미지 설정 (4K 해상도 + 자동 비율 적용)
+# 출력 이미지 설정 (4K 해상도 + 세로 패턴 비율)
 # ─────────────────────────────────────────────
 # image_size: "512", "1K", "2K", "4K" 중 선택 가능
-# aspect_ratio를 설정하지 않으면 모델이 최적의 비율을 자동으로 선택합니다.
 IMAGE_CONFIG = types.ImageConfig(
     image_size="4K",
-    aspect_ratio=None  # 또는 아예 이 라인을 삭제해도 무방합니다.
+    aspect_ratio="2:3",
 )
 
 # ─────────────────────────────────────────────
@@ -58,8 +57,8 @@ SAFETY_SETTINGS = [
 CHAT_CONFIG = types.GenerateContentConfig(
     response_modalities=RESPONSE_MODALITIES,
     image_config=IMAGE_CONFIG,
+    media_resolution=types.MediaResolution.MEDIA_RESOLUTION_HIGH,
     safety_settings=SAFETY_SETTINGS,
-    temperature=0,
 )
 
 # ─────────────────────────────────────────────
@@ -78,8 +77,8 @@ def build_response_config(
 
     kwargs = {
         "response_modalities": list(modalities),
+        "media_resolution": types.MediaResolution.MEDIA_RESOLUTION_HIGH,
         "safety_settings": SAFETY_SETTINGS,
-        "temperature": 0,
     }
     if "IMAGE" in modalities:
         kwargs["image_config"] = IMAGE_CONFIG

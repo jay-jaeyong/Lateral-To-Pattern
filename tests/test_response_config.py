@@ -2,12 +2,32 @@
 
 import unittest
 
-from config.gemini_config import IMAGE_CONFIG, build_response_config
+from google.genai import types
+
+from config.gemini_config import CHAT_CONFIG, IMAGE_CONFIG, build_response_config
 from core.models import StepResponse
 from services.gemini_client import GeminiClient
 
 
 class BuildResponseConfigTest(unittest.TestCase):
+    def test_image_output_is_portrait_two_to_three(self):
+        self.assertEqual(IMAGE_CONFIG.aspect_ratio, "2:3")
+
+    def test_default_chat_uses_high_media_resolution_and_default_temperature(self):
+        self.assertEqual(
+            CHAT_CONFIG.media_resolution,
+            types.MediaResolution.MEDIA_RESOLUTION_HIGH,
+        )
+        self.assertIsNone(CHAT_CONFIG.temperature)
+
+    def test_text_override_keeps_high_media_resolution_and_default_temperature(self):
+        config = build_response_config(["TEXT"])
+        self.assertEqual(
+            config.media_resolution,
+            types.MediaResolution.MEDIA_RESOLUTION_HIGH,
+        )
+        self.assertIsNone(config.temperature)
+
     def test_none_means_use_session_default(self):
         self.assertIsNone(build_response_config(None))
 
