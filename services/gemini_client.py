@@ -115,6 +115,21 @@ class GeminiClient:
             if allowed_classes and isinstance(p, allowed_classes):
                 sanitized.append(p)
                 continue
+            # 앞 단계에서 생성된 이미지는 genai types.Image로 돌아옵니다. SDK가
+            # 그대로는 못 받는 타입이라 Part로 감싸줍니다. 바이트를 그대로 넘기므로
+            # 재인코딩이 없어 원본 화질이 유지됩니다.
+            image_cls = getattr(genai_types, "Image", None)
+            if image_cls is not None and isinstance(image_cls, type) and isinstance(p, image_cls):
+                try:
+                    sanitized.append(
+                        genai_types.Part.from_bytes(
+                            data=p.image_bytes, mime_type=p.mime_type or "image/png"
+                        )
+                    )
+                    continue
+                except Exception:
+                    logger.exception("생성 이미지를 Part로 변환하지 못했습니다 — 이 파트를 건너뜁니다.")
+                    continue
             # dict-like (PartDict / FileDict 는 TypedDict이므로 dict로만 판별)
             if isinstance(p, dict):
                 sanitized.append(p)
