@@ -333,6 +333,8 @@ class Pipeline:
                 )
             except Exception:
                 logger.exception("parts 조립 실패 — 프롬프트만으로 진행합니다.")
+                if reuse_initial_references:
+                    raise
                 parts = [prompt]
 
             # ── Step 1 참조 parts 캡처 (이후 단계 재사용용) ─────────────────

@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock
 from PIL import Image
 
 from config.prompts import PIPELINE_STEPS
+from core._parts_builder import build_step_parts as real_build_step_parts
 from core.pipeline import Pipeline
 from core.models import StepResponse
 
@@ -247,6 +248,59 @@ class PipelineWiringTest(unittest.TestCase):
                 pipeline.run(skip_initial_selection=True)
 
             self.assertEqual(mock_instance.send.call_count, 1)
+
+    def test_required_reference_assembly_error_propagates_before_step2_send(self):
+        """참조 재사용 단계의 parts 조립 실패는 prompt-only fallback으로 숨기지 않습니다."""
+        steps = [
+            {
+                "step": 1,
+                "name": "step1",
+                "description": "test",
+                "prompt": "STEP 1 PROMPT",
+                "image_path": self.shoe_img,
+                "response_modalities": ["TEXT"],
+                "save_output": False,
+            },
+            {
+                "step": 2,
+                "name": "step2",
+                "description": "test",
+                "prompt": "STEP 2 PROMPT",
+                "image_path": None,
+                "guide_image_path": self.guide_img,
+                "reuse_initial_references": True,
+                "save_output": False,
+            },
+        ]
+
+        def fail_only_for_step2(*args, **kwargs):
+            if kwargs["step_num"] == 1:
+                return real_build_step_parts(*args, **kwargs)
+            raise ValueError("reference parts assembly failed")
+
+        with (
+            patch("core.pipeline.GeminiClient") as MockClient,
+            patch(
+                "core.pipeline.build_step_parts",
+                side_effect=fail_only_for_step2,
+            ) as mock_build_parts,
+        ):
+            mock_instance = MagicMock()
+            MockClient.return_value = mock_instance
+            mock_instance.send.return_value = StepResponse(
+                text="Step 1 output",
+                images=[],
+            )
+
+            pipeline = Pipeline(steps=steps, output_dir=Path(self.tmp))
+            with self.assertRaisesRegex(ValueError, "reference parts assembly failed"):
+                pipeline.run(skip_initial_selection=True)
+
+        self.assertEqual(mock_instance.send.call_count, 1)
+        self.assertEqual(
+            [call.kwargs["step_num"] for call in mock_build_parts.call_args_list],
+            [1, 2],
+        )
 
     def test_single_file_replays_a_labeled_reference(self):
         """단일 파일 입력도 Step 1과 Step 2 모두 라벨+이미지 parts를 사용합니다."""
