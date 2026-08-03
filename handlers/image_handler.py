@@ -121,19 +121,12 @@ class ImageHandler:
             path = Path(image_path)
 
             if path.is_dir():
-                # ── 폴더 바로 아래 이미지 파일이 있으면 파일 선택 모드 ────────────
-                # (가이드라인 파일은 후보에서 제외합니다.)
+                # ── 한 모델의 뷰 파일이 바로 있으면 하나의 멀티뷰 요청 ────────
                 files = ImageHandler.list_image_files(path, exclude_guideline=True)
 
                 if files:
-                    selected_files = ImageHandler._select_entries(path, files, kind="이미지")
-                    ImageHandler._last_selected_files = selected_files
-                    ImageHandler._last_selection_was_all = len(selected_files) == len(files)
-
-                    # 선택된 첫 번째 파일을 로드합니다.
-                    # (batch "all" 실행 시 pipeline이 나머지 파일을 순회합니다.)
-                    logger.info("입력 이미지 선택: %s", selected_files[0])
-                    return [ImageHandler.load(selected_files[0]), prompt]
+                    ImageHandler._last_selected_files = [path]
+                    return ImageHandler._load_dir_images(path, prompt, max_images)
 
                 # ── 이미지 파일이 없고 서브폴더가 있으면 폴더 선택 모드 ───────────
                 subdirs = sorted(
@@ -155,8 +148,12 @@ class ImageHandler:
             # ── 단일 파일 ────────────────────────────────────────────────────────
             if path.is_file():
                 ImageHandler._last_selected_files = [path]
-                image = ImageHandler.load(path)
-                return [image, prompt]
+                from utils.cli import label_image_files
+
+                return ImageHandler.build_labeled_parts(
+                    label_image_files([path]),
+                    prompt,
+                )
 
         return [prompt]
 
@@ -236,7 +233,7 @@ class ImageHandler:
         """
         from utils.cli import label_image_files
 
-        image_files = ImageHandler.list_image_files(folder)
+        image_files = ImageHandler.list_image_files(folder, exclude_guideline=True)
         if not image_files:
             logger.info("폴더에 이미지 없음: %s — 프롬프트만으로 진행합니다.", folder)
             return [prompt]

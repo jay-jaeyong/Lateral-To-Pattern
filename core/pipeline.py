@@ -170,8 +170,9 @@ class Pipeline:
                 per_steps[0]["view_images"] = label_image_files(image_files)
                 per_steps[0]["image_path"] = None
             else:
-                # 파일 타겟은 기존 방식 (image_path 설정)
-                per_steps[0]["image_path"] = target_path
+                # 파일 target도 Step 1에서 정확한 뷰/파일명 라벨을 유지합니다.
+                per_steps[0]["view_images"] = label_image_files([target_path])
+                per_steps[0]["image_path"] = None
 
             # 경로 stem이 뷰 플래그 이름이면 부모 폴더명을 사용합니다.
             label = resolve_run_label_from_path(target_path)

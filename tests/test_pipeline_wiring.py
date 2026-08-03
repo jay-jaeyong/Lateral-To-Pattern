@@ -248,6 +248,148 @@ class PipelineWiringTest(unittest.TestCase):
 
             self.assertEqual(mock_instance.send.call_count, 1)
 
+    def test_single_file_replays_a_labeled_reference(self):
+        """단일 파일 입력도 Step 1과 Step 2 모두 라벨+이미지 parts를 사용합니다."""
+        steps = [
+            {
+                "step": 1,
+                "name": "step1",
+                "description": "test",
+                "prompt": "STEP 1 PROMPT",
+                "image_path": self.shoe_img,
+                "response_modalities": ["TEXT"],
+                "save_output": False,
+            },
+            {
+                "step": 2,
+                "name": "step2",
+                "description": "test",
+                "prompt": "STEP 2 PROMPT",
+                "image_path": None,
+                "guide_image_path": self.guide_img,
+                "reuse_initial_references": True,
+                "save_output": False,
+            },
+        ]
+
+        with patch("core.pipeline.GeminiClient") as MockClient:
+            mock_instance = MagicMock()
+            MockClient.return_value = mock_instance
+            mock_instance.send.side_effect = [
+                StepResponse(text="Step 1 output", images=[]),
+                StepResponse(text="Step 2 output", images=[]),
+            ]
+
+            pipeline = Pipeline(steps=steps, output_dir=Path(self.tmp))
+            pipeline.run(skip_initial_selection=True)
+
+        first_parts = mock_instance.send.call_args_list[0][0][0]
+        second_parts = mock_instance.send.call_args_list[1][0][0]
+        self.assertEqual(first_parts[0], "[사진 1] 파일명: shoe")
+        self.assertIsInstance(first_parts[1], Image.Image)
+        self.assertEqual(second_parts[0], "[사진 1] 파일명: shoe")
+        self.assertIs(second_parts[1], first_parts[1])
+
+    def test_direct_image_folder_replays_all_labeled_views(self):
+        """뷰 파일이 바로 들어 있는 폴더는 한 번의 라벨된 멀티뷰 요청이 됩니다."""
+        folder = self.tmp / "shoe_views"
+        folder.mkdir()
+        make_test_image(folder / "lateral.png")
+        make_test_image(folder / "medial.png")
+
+        steps = [
+            {
+                "step": 1,
+                "name": "step1",
+                "description": "test",
+                "prompt": "STEP 1 PROMPT",
+                "image_path": folder,
+                "response_modalities": ["TEXT"],
+                "save_output": False,
+            },
+            {
+                "step": 2,
+                "name": "step2",
+                "description": "test",
+                "prompt": "STEP 2 PROMPT",
+                "image_path": None,
+                "guide_image_path": self.guide_img,
+                "reuse_initial_references": True,
+                "save_output": False,
+            },
+        ]
+
+        with patch("core.pipeline.GeminiClient") as MockClient:
+            mock_instance = MagicMock()
+            MockClient.return_value = mock_instance
+            mock_instance.send.side_effect = [
+                StepResponse(text="Step 1 output", images=[]),
+                StepResponse(text="Step 2 output", images=[]),
+            ]
+
+            pipeline = Pipeline(steps=steps, output_dir=Path(self.tmp))
+            pipeline.run(skip_initial_selection=True)
+
+        first_parts = mock_instance.send.call_args_list[0][0][0]
+        second_parts = mock_instance.send.call_args_list[1][0][0]
+        self.assertEqual(first_parts[0], "[사진 1] 바깥쪽 측면(lateral)")
+        self.assertIsInstance(first_parts[1], Image.Image)
+        self.assertEqual(first_parts[2], "[사진 2] 안쪽 측면(medial)")
+        self.assertIsInstance(first_parts[3], Image.Image)
+        self.assertIs(second_parts[1], first_parts[1])
+        self.assertIs(second_parts[3], first_parts[3])
+
+    def test_file_batch_replays_each_labeled_reference(self):
+        """파일 batch의 각 실행이 정확한 파일 라벨을 Step 2까지 유지합니다."""
+        lateral = make_test_image(self.tmp / "lateral.png")
+        front = make_test_image(self.tmp / "front.png")
+        steps = [
+            {
+                "step": 1,
+                "name": "step1",
+                "description": "test",
+                "prompt": "STEP 1 PROMPT",
+                "image_path": None,
+                "response_modalities": ["TEXT"],
+                "save_output": False,
+            },
+            {
+                "step": 2,
+                "name": "step2",
+                "description": "test",
+                "prompt": "STEP 2 PROMPT",
+                "image_path": None,
+                "guide_image_path": self.guide_img,
+                "reuse_initial_references": True,
+                "save_output": False,
+            },
+        ]
+
+        with patch("core.pipeline.GeminiClient") as MockClient:
+            mock_instance = MagicMock()
+            MockClient.return_value = mock_instance
+            mock_instance.send.side_effect = [
+                StepResponse(text="Step 1 lateral", images=[]),
+                StepResponse(text="Step 2 lateral", images=[]),
+                StepResponse(text="Step 1 front", images=[]),
+                StepResponse(text="Step 2 front", images=[]),
+            ]
+
+            pipeline = Pipeline(
+                steps=steps,
+                output_dir=Path(self.tmp),
+                batch_targets=[lateral, front],
+            )
+            pipeline.run()
+
+        calls = mock_instance.send.call_args_list
+        self.assertEqual(calls[0][0][0][0], "[사진 1] 바깥쪽 측면(lateral)")
+        self.assertEqual(calls[1][0][0][0], "[사진 1] 바깥쪽 측면(lateral)")
+        self.assertEqual(calls[2][0][0][0], "[사진 1] 앞쪽에서 본 모습(front)")
+        self.assertEqual(calls[3][0][0][0], "[사진 1] 앞쪽에서 본 모습(front)")
+        self.assertIs(calls[1][0][0][1], calls[0][0][0][1])
+        self.assertIs(calls[3][0][0][1], calls[2][0][0][1])
+
 
 if __name__ == "__main__":
     unittest.main()

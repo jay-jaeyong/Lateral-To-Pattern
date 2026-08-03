@@ -111,7 +111,8 @@ class BuildStepPartsTest(unittest.TestCase):
             prev_images=[],
             prev_texts=[],
         )
-        self.assertIsInstance(parts[0], Image.Image)
+        self.assertEqual(parts[0], "[사진 1] 파일명: single")
+        self.assertIsInstance(parts[1], Image.Image)
         self.assertEqual(parts[-1], "PROMPT")
 
     def test_initial_references_precede_guide_and_previous_text(self):
