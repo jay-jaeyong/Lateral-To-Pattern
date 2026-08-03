@@ -7,6 +7,8 @@ Lateral-To-Pattern — 메인 실행 파일
     python main.py --run-label my_experiment
     python main.py --output-dir results
     python main.py --shoe-image path/to/side_view.png --guide-image path/to/guideline.jpg
+    python main.py --shoe-image shoe_a.jpg shoe_b.jpg shoe_c.jpg   # 이미지마다 개별 실행
+    python main.py --lateral lat.webp --medial med.webp --top top.webp   # 한 켤레 멀티뷰
 
 파이프라인 흐름:
     신발 실물 사진(사이드뷰) + 2D 펼침 가이드라인(틀) + 프롬프트
@@ -23,7 +25,12 @@ from pathlib import Path
 from core.pipeline import Pipeline
 from config.prompts import PIPELINE_STEPS
 from utils.logging_utils import StepFilter
-from utils.cli import build_parser, apply_image_overrides
+from utils.cli import (
+    apply_image_overrides,
+    collect_view_images,
+    derive_run_label,
+    parse_args,
+)
 
 
 # ─────────────────────────────────────────────
@@ -52,8 +59,7 @@ def setup_logging(verbose: bool = False) -> None:
 # ─────────────────────────────────────────────
 
 def main() -> None:
-    parser = build_parser()
-    args = parser.parse_args()
+    args = parse_args()
 
     setup_logging(verbose=args.verbose)
     logger = logging.getLogger(__name__)
@@ -62,22 +68,36 @@ def main() -> None:
     logger.info("Lateral-To-Pattern 파이프라인 시작")
     logger.info("=" * 60)
 
+    # 뷰 플래그가 하나라도 있으면 그것들이 신발 사진 전체를 정의합니다.
+    view_images = collect_view_images(args)
+    if view_images and not args.lateral:
+        logger.warning(
+            "기준이 되는 --lateral 사진이 없습니다. "
+            "받은 사진 중 옆면에 해당하는 것을 기준으로 삼습니다."
+        )
+
     # CLI 이미지 경로 오버라이드 적용
     steps = apply_image_overrides(
         PIPELINE_STEPS,
         shoe_image=args.shoe_image,
         guide_image=args.guide_image,
+        view_images=view_images,
     )
 
-    # If the user provided an explicit run label, use it; otherwise we allow
-    # the Pipeline to set the label based on the selected image later.
-    run_label = args.run_label
+    # 뷰 플래그를 쓰면 모델 폴더 이름이 없으므로 lateral 파일명을 출력 폴더로 씁니다.
+    # 그 외에는 Pipeline이 선택된 이미지 이름으로 레이블을 정합니다.
+    run_label = args.run_label or derive_run_label(view_images)
+
+    # 신발 이미지를 2개 이상 받았다면 각각 개별 실행합니다.
+    shoe_images = [] if view_images else (args.shoe_image or [])
+    batch_targets = [Path(p) for p in shoe_images] if len(shoe_images) > 1 else None
 
     # 파이프라인 실행
     pipeline = Pipeline(
         steps=steps,
         output_dir=Path(args.output_dir),
         run_label=run_label,
+        batch_targets=batch_targets,
     )
 
     try:
