@@ -185,6 +185,14 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("복원면에서 빼지 마", unfold)
         self.assertIn("명세서의 좌우 판정을 따라", unfold)
 
+    def test_unfold_forbids_annotations_and_grey_background(self):
+        """라벨·기호가 찍히면 재단 패턴이 아니라 도해가 됩니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("부품 도해가 아니야", unfold)
+        self.assertIn("알파벳 기호", unfold)
+        self.assertIn("순백(#FFFFFF)", unfold)
+        self.assertIn("원래 박혀 있는 로고와 글자는 실물의 일부", unfold)
+
 
 if __name__ == "__main__":
     unittest.main()
