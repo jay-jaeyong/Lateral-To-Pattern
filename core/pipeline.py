@@ -18,6 +18,7 @@ import logging
 from pathlib import Path
 
 from config.prompts import PIPELINE_STEPS
+from config.gemini_config import build_response_config
 from core.models import StepResult, PipelineResult, StepResponse
 from core._parts_builder import build_step_parts
 from services.gemini_client import GeminiClient
@@ -328,7 +329,18 @@ class Pipeline:
                 logger.info("%s\n[ CHAT HISTORY BEFORE SEND ]\n<failed to format history>\n%s", sep, sep)
 
             # Gemini API 호출 → 텍스트 + 생성 이미지
-            step_response: StepResponse = self._client.send(parts)
+            # 관찰 스텝처럼 텍스트 응답이 필요한 단계만 모달리티를 바꿔 부릅니다.
+            response_modalities = config.get("response_modalities")
+            step_response: StepResponse = self._client.send(
+                parts, config=build_response_config(response_modalities)
+            )
+
+            if response_modalities and "TEXT" in response_modalities and not step_response.text:
+                logger.warning(
+                    "Step %d: TEXT 응답을 요청했지만 텍스트가 비어 있습니다. "
+                    "다음 단계로 넘길 명세서가 없습니다.",
+                    step_num,
+                )
 
             # 결과 저장
             output_file: Path | None = None
