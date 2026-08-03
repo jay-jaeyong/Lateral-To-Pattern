@@ -5,7 +5,7 @@ Pipeline
 
 관찰 → 펼치기 → 라인 아트 3스텝을 같은 채팅 세션에서 순차 실행합니다.
   Step 1: [라벨, 신발 사진, ..., 프롬프트] → 텍스트 명세서
-  Step 2: [가이드라인, Step 1 명세서, 프롬프트] → 2D 패턴 이미지
+  Step 2: [실물 사진, 가이드라인, Step 1 명세서, 프롬프트] → 2D 패턴 이미지
   Step 3: [Step 2 이미지, Step 1 명세서, 프롬프트] → 라인 아트 이미지
 
 이전 단계의 응답을 채팅 히스토리로 유지한 채 순차 실행되므로,
@@ -61,8 +61,8 @@ class Pipeline:
             output_dir=Path(output_dir),
             run_label=run_label,
         )
-        # 초기 입력 이미지(단계별)를 보관합니다. key: step number -> list[PIL.Image]
-        self._initial_images: dict[int, list] = {}
+        # Step 1에서 실제 API 요청에 사용한 라벨+이미지 parts를 보관합니다.
+        self._initial_reference_parts: list = []
         # 사용자가 명시적으로 run_label을 제공했는지 여부
         self._run_label_forced = run_label is not None
 
@@ -300,6 +300,18 @@ class Pipeline:
         guide_image_path = config.get("guide_image_path")
         view_images = config.get("view_images")
         should_save = config.get("save_output", True)
+        reuse_initial_references = config.get("reuse_initial_references", False)
+        initial_reference_parts = (
+            list(self._initial_reference_parts)
+            if reuse_initial_references
+            else None
+        )
+
+        if reuse_initial_references and not any(
+            isinstance(part, PILImage.Image)
+            for part in initial_reference_parts or []
+        ):
+            raise RuntimeError("Step 2에 재사용할 실물 참조 이미지가 없습니다.")
 
         with step_context(step_num):
             logger.info("─── Step %d: %s ───", step_num, description)
@@ -316,18 +328,15 @@ class Pipeline:
                     guide_image_path=guide_image_path,
                     max_images=config.get("max_images"),
                     view_images=view_images,
+                    initial_reference_parts=initial_reference_parts,
                 )
             except Exception:
                 logger.exception("parts 조립 실패 — 프롬프트만으로 진행합니다.")
                 parts = [prompt]
 
-            # ── 입력 이미지 캡처 (이후 단계 재사용용) ──────────────────────
-            try:
-                imgs_in_parts = [p for p in parts if isinstance(p, PILImage.Image)]
-                if imgs_in_parts:
-                    self._initial_images[step_num] = imgs_in_parts
-            except Exception:
-                logger.debug("입력 이미지 캡처 실패 (무시)")
+            # ── Step 1 참조 parts 캡처 (이후 단계 재사용용) ─────────────────
+            if step_num == 1:
+                self._initial_reference_parts = list(parts[:-1])
 
             # 이미지 선택이 발생했고, 사용자가 run_label을 명시하지 않았다면
             # 출력 레이블을 선택한 이미지 이름으로 설정합니다 (실제 디렉터리 생성 전).

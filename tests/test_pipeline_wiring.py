@@ -156,6 +156,98 @@ class PipelineWiringTest(unittest.TestCase):
             combined_text = " ".join(text_parts)
             self.assertIn(step1_text, combined_text)
 
+    def test_step2_replays_step1_reference_parts_in_order(self):
+        """Step 2가 Step 1의 라벨+이미지를 같은 순서로 재사용하는지 확인합니다."""
+        first_view = make_test_image(self.tmp / "lateral.png")
+        second_view = make_test_image(self.tmp / "medial.png")
+        step1_text = "Step 1 specification"
+
+        steps = [
+            {
+                "step": 1,
+                "name": "step1",
+                "description": "test",
+                "prompt": "STEP 1 PROMPT",
+                "image_path": None,
+                "view_images": [
+                    ("바깥쪽 측면(lateral)", first_view),
+                    ("안쪽 측면(medial)", second_view),
+                ],
+                "response_modalities": ["TEXT"],
+                "save_output": False,
+            },
+            {
+                "step": 2,
+                "name": "step2",
+                "description": "test",
+                "prompt": "STEP 2 PROMPT",
+                "image_path": None,
+                "guide_image_path": self.guide_img,
+                "reuse_initial_references": True,
+                "save_output": False,
+            },
+        ]
+
+        with patch("core.pipeline.GeminiClient") as MockClient:
+            mock_instance = MagicMock()
+            MockClient.return_value = mock_instance
+            mock_instance.send.side_effect = [
+                StepResponse(text=step1_text, images=[]),
+                StepResponse(text="Step 2 output", images=[]),
+            ]
+
+            pipeline = Pipeline(steps=steps, output_dir=Path(self.tmp))
+            pipeline.run(skip_initial_selection=True)
+
+            parts = mock_instance.send.call_args_list[1][0][0]
+
+        self.assertEqual(parts[0], "[사진 1] 바깥쪽 측면(lateral)")
+        self.assertIsInstance(parts[1], Image.Image)
+        self.assertEqual(parts[2], "[사진 2] 안쪽 측면(medial)")
+        self.assertIsInstance(parts[3], Image.Image)
+        self.assertEqual(parts[4], "[가이드라인]")
+        self.assertIsInstance(parts[5], Image.Image)
+        self.assertIn(step1_text, parts[6])
+        self.assertEqual(parts[7], "STEP 2 PROMPT")
+
+    def test_step2_requiring_references_fails_before_send_when_missing(self):
+        """재사용할 실물 참조가 없으면 Step 2 API 호출 전에 실패합니다."""
+        steps = [
+            {
+                "step": 1,
+                "name": "step1",
+                "description": "test",
+                "prompt": "STEP 1 PROMPT",
+                "image_path": None,
+                "response_modalities": ["TEXT"],
+                "save_output": False,
+            },
+            {
+                "step": 2,
+                "name": "step2",
+                "description": "test",
+                "prompt": "STEP 2 PROMPT",
+                "image_path": None,
+                "guide_image_path": self.guide_img,
+                "reuse_initial_references": True,
+                "save_output": False,
+            },
+        ]
+
+        with patch("core.pipeline.GeminiClient") as MockClient:
+            mock_instance = MagicMock()
+            MockClient.return_value = mock_instance
+            mock_instance.send.return_value = StepResponse(
+                text="Step 1 output",
+                images=[],
+            )
+
+            pipeline = Pipeline(steps=steps, output_dir=Path(self.tmp))
+            with self.assertRaisesRegex(RuntimeError, "실물 참조 이미지"):
+                pipeline.run(skip_initial_selection=True)
+
+            self.assertEqual(mock_instance.send.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()
