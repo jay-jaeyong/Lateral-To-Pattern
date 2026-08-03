@@ -219,12 +219,13 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("열접착·본딩(무봉제)", survey)
         self.assertIn("실이 눈에 보이지 않으면 재봉이 아니야", survey)
 
-    def test_survey_sweeps_relief_beyond_logos(self):
+    def test_survey_relief_covers_both_directions_and_non_logos(self):
         """음각을 로고 예시와만 묶어두면 반복 문양과 홈을 놓칩니다."""
         survey = PIPELINE_STEPS[0]["prompt"]
-        self.assertIn("음각(파인 것)과 양각(솟은 것)", survey)
-        self.assertIn("반복 문양·리브·홈·슬롯·격자", survey)
-        self.assertIn("개수를 세서 적어", survey)
+        self.assertIn("음각(파인 것)·양각(솟은 것)", survey)
+        self.assertIn("홈·리브·슬롯·격자", survey)
+        self.assertIn("종류와 개수와 방향", survey)
+        self.assertIn("저대비든 고대비든 상관없어", survey)
 
     def test_survey_anchors_parts_to_landmarks(self):
         """랜드마크 없이 '측면 하단'만 적으면 펼치기가 부품을 옮겨버립니다."""
