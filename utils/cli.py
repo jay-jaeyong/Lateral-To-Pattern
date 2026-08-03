@@ -53,7 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="+",
         metavar="PATH",
         default=None,
-        help="신발 실물 사진(사이드뷰) 경로 또는 폴더. 여러 개를 주면 각각 따로 실행합니다. "
+        help="신발 실물 사진 경로 또는 폴더. 여러 개를 주면 각각 따로 실행합니다. "
              "(미입력 시 config/prompts.py 설정 사용)",
     )
     parser.add_argument(

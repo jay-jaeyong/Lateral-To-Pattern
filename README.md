@@ -202,12 +202,14 @@ python main.py --verbose
 
 ```
 output/{모델명}/
-├── step_01_pattern_unfold.md   # 입력·프롬프트·응답
-├── final_output.md             # 최종 응답 전문
-└── chat_history.json           # 전체 채팅 히스토리 (JSON)
+├── step_01_part_survey.md              # Step 1: 부품 명세서 텍스트
+├── step_02_pattern_unfold_generated_01.png  # Step 2: 2D 패턴 이미지
+├── step_03_line_art_conversion_generated_01.png  # Step 3: 라인 아트 이미지
+├── final_output.md                     # 최종 결과 요약
+└── chat_history.json                   # 전체 채팅 히스토리 (JSON)
 ```
 
-생성된 이미지는 Markdown 파일과 동일한 폴더에 저장됩니다.
+생성된 이미지는 동일한 폴더에 저장됩니다.
 
 ---
 

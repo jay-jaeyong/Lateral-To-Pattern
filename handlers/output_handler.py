@@ -6,9 +6,9 @@ Output Handler
 저장 구조:
     output/
     └── {run_label}/              ← 실행별 폴더 (타임스탬프 또는 사용자 지정)
-        ├── step_01_initial_analysis.md
-        ├── step_02_lateral_pattern_extraction.md
-        ├── step_03_final_synthesis.md
+        ├── step_01_part_survey.md
+        ├── step_02_pattern_unfold_generated_01.png
+        ├── step_03_line_art_conversion_generated_01.png
         └── final_output.md       ← 전체 결과 + 채팅 히스토리 요약
 """
 

@@ -109,7 +109,7 @@ class ImageHandler:
             prompt: 텍스트 프롬프트.
             image_path: 이미지 파일 경로 (None이면 텍스트만).
             max_images: 폴더에서 불러올 이미지 최대 장수 (None이면 전부).
-                        1이면 정렬 기준 첫 이미지(사이드뷰)만 사용합니다.
+                        1이면 정렬 기준 첫 이미지만 사용합니다.
 
         Returns:
             Gemini API에 전달할 parts 리스트.

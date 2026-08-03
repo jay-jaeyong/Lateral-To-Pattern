@@ -11,8 +11,10 @@ Lateral-To-Pattern — 메인 실행 파일
     python main.py --lateral lat.webp --medial med.webp --top top.webp   # 한 켤레 멀티뷰
 
 파이프라인 흐름:
-    신발 실물 사진(사이드뷰) + 2D 펼침 가이드라인(틀) + 프롬프트
-        → Gemini API (패턴 펼치기)
+    신발 실물 사진(여러 각도)
+        → Gemini API (부품 관찰)      → 부품 명세서 텍스트
+        → Gemini API (패턴 펼치기)    → 2D 전개 패턴 이미지
+        → Gemini API (라인 아트 변환) → 라인 아트 이미지
         → output/ 저장
 """
 
