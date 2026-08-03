@@ -50,25 +50,33 @@ class PromptContentTest(unittest.TestCase):
     def test_unfold_has_multiview_rule(self):
         self.assertIn('"multiview_rule"', PIPELINE_STEPS[1]["prompt"])
 
-    def test_unfold_names_the_lateral_label_exactly(self):
-        lateral_label = dict(VIEW_FLAGS)["lateral"]
-        self.assertIn(lateral_label, PIPELINE_STEPS[1]["prompt"])
+    def test_unfold_names_view_labels_exactly(self):
+        """펼치기 프롬프트가 지목하는 뷰 라벨은 VIEW_FLAGS와 한 글자도 달라선 안 됩니다."""
+        labels = dict(VIEW_FLAGS)
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        for name in ("lateral", "medial", "top", "front", "heel"):
+            self.assertIn(labels[name], unfold, msg=name)
 
-    def test_unfold_names_the_medial_label_exactly(self):
-        medial_label = dict(VIEW_FLAGS)["medial"]
-        self.assertIn(medial_label, PIPELINE_STEPS[1]["prompt"])
+    def test_survey_names_the_quarter_labels_exactly(self):
+        """쿼터 뷰 설명은 관찰 스텝에도 있고, 거기서도 라벨이 정확해야 합니다."""
+        labels = dict(VIEW_FLAGS)
+        survey = PIPELINE_STEPS[0]["prompt"]
+        for name in ("front", "heel"):
+            self.assertIn(labels[name], survey, msg=name)
 
-    def test_unfold_names_the_top_label_exactly(self):
-        top_label = dict(VIEW_FLAGS)["top"]
-        self.assertIn(top_label, PIPELINE_STEPS[1]["prompt"])
-
-    def test_unfold_names_the_front_label_exactly(self):
-        front_label = dict(VIEW_FLAGS)["front"]
-        self.assertIn(front_label, PIPELINE_STEPS[1]["prompt"])
-
-    def test_unfold_names_the_heel_label_exactly(self):
-        heel_label = dict(VIEW_FLAGS)["heel"]
-        self.assertIn(heel_label, PIPELINE_STEPS[1]["prompt"])
+    def test_quarter_labels_are_never_written_without_the_parenthetical(self):
+        """'쿼터 프론트 뷰'만 쓰고 '(quarter front)'를 빼면 라벨과 어긋납니다."""
+        labels = dict(VIEW_FLAGS)
+        for step in PIPELINE_STEPS:
+            prompt = step["prompt"]
+            for name in ("front", "heel"):
+                full = labels[name]
+                bare = full.split("(")[0]
+                self.assertEqual(
+                    prompt.count(bare),
+                    prompt.count(full),
+                    msg=f"{step['name']}: '{bare}'가 '{full}' 밖에서 쓰였습니다",
+                )
 
     def test_survey_demands_unconfirmed_list(self):
         survey = PIPELINE_STEPS[0]["prompt"]

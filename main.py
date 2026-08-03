@@ -31,6 +31,7 @@ from utils.cli import (
     apply_image_overrides,
     collect_view_images,
     derive_run_label,
+    guide_path_problem,
     parse_args,
 )
 
@@ -85,6 +86,18 @@ def main() -> None:
         guide_image=args.guide_image,
         view_images=view_images,
     )
+
+    # --guide-image를 생략하면 config/prompts.py의 기본 경로가 쓰입니다. 그 경로에
+    # 가이드라인이 없어도 파이프라인은 경고만 남기고 끝까지 도는데, 그러면 틀 없이
+    # 펼친 결과가 나옵니다. 실제로 쓰일 경로를 여기서 미리 검사합니다.
+    for step_config in steps:
+        guide_path = step_config.get("guide_image_path")
+        if guide_path is None:
+            continue
+        problem = guide_path_problem(Path(guide_path))
+        if problem:
+            logger.error("Step %s 가이드라인 오류 — %s", step_config.get("step"), problem)
+            sys.exit(1)
 
     # 뷰 플래그를 쓰면 모델 폴더 이름이 없으므로 lateral 파일명을 출력 폴더로 씁니다.
     # 그 외에는 Pipeline이 선택된 이미지 이름으로 레이블을 정합니다.

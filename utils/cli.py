@@ -88,19 +88,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                 parser.error(f"--shoe-image 경로를 찾을 수 없습니다: {path_str}")
 
     if args.guide_image:
-        guide_path = Path(args.guide_image)
-        if not guide_path.exists():
-            parser.error(f"--guide-image 경로를 찾을 수 없습니다: {args.guide_image}")
-        # 디렉터리면 가이드라인 파일을 포함하는지 검사합니다.
-        if guide_path.is_dir():
-            from handlers.image_handler import ImageHandler
-            if not ImageHandler.find_guideline(guide_path):
-                parser.error(
-                    f"--guide-image 디렉터리에 가이드라인 파일을 찾지 못했습니다: {args.guide_image}\n"
-                    f"파일명에 '{', '.join(ImageHandler.GUIDELINE_KEYWORDS)}' 중 하나를 포함해야 합니다."
-                )
+        problem = guide_path_problem(Path(args.guide_image))
+        if problem:
+            parser.error(f"--guide-image: {problem}")
 
     return args
+
+
+def guide_path_problem(guide_path: Path) -> str | None:
+    """가이드라인 경로에서 실제로 가이드라인을 찾을 수 있는지 검사합니다.
+
+    문제가 있으면 사람이 읽을 메시지를, 없으면 None을 반환합니다.
+    CLI가 준 경로와 config/prompts.py의 기본 경로 양쪽에 같은 기준을 적용하기 위해
+    별도 함수로 둡니다.
+    """
+    from handlers.image_handler import ImageHandler
+
+    if not guide_path.exists():
+        return f"경로를 찾을 수 없습니다: {guide_path}"
+
+    if guide_path.is_dir() and not ImageHandler.find_guideline(guide_path):
+        return (
+            f"'{guide_path}'에서 가이드라인 파일을 찾지 못했습니다.\n"
+            f"파일명에 '{', '.join(ImageHandler.GUIDELINE_KEYWORDS)}' 중 "
+            f"하나를 포함한 이미지를 넣어주세요."
+        )
+
+    return None
 
 
 def collect_view_images(args: argparse.Namespace) -> list[tuple[str, Path]]:
@@ -190,6 +204,10 @@ def apply_image_overrides(
         updated[0]["image_path"] = Path(first)
 
     if guide_image:
-        updated[0]["guide_image_path"] = Path(guide_image)
+        # 가이드라인을 실제로 쓰는 스텝에만 덮어씁니다. 첫 스텝(관찰)은
+        # guide_image_path가 None이라 여기에 넣으면 관찰 대상에 틀이 섞입니다.
+        for step_config in updated:
+            if step_config.get("guide_image_path") is not None:
+                step_config["guide_image_path"] = Path(guide_image)
 
     return updated
