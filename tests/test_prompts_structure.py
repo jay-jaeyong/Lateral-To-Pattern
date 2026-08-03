@@ -1,5 +1,6 @@
 """프롬프트 3스텝 구조와 라벨 문자열 일치 테스트."""
 
+import re
 import unittest
 
 from config.prompts import PIPELINE_STEPS
@@ -49,6 +50,43 @@ class PromptContentTest(unittest.TestCase):
 
     def test_unfold_has_multiview_rule(self):
         self.assertIn('"multiview_rule"', PIPELINE_STEPS[1]["prompt"])
+
+    def test_unfold_keeps_every_rule_block(self):
+        """규칙 블록이 통째로 사라지면 방향·솔 제외·힐 절개 같은 제약이 함께 없어집니다."""
+        expected = [
+            "priority", "input", "multiview_rule", "reconstruct_rule", "pair_rule",
+            "task", "fit_rule", "exclude", "heel_rule", "part_rule", "flat_rule",
+            "task_rule", "guideline_rule", "outline_rule", "empty_rule",
+            "background_rule", "caution",
+        ]
+        found = re.findall(r'"([a-z_]+)": \[', PIPELINE_STEPS[1]["prompt"])
+        self.assertEqual(found, expected)
+
+    def test_unfold_keeps_orientation_rules(self):
+        """Toe가 아래, Heel이 위라는 방향 규칙이 있어야 결과가 뒤집히지 않습니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("Toe(앞코)가 아래쪽", unfold)
+        self.assertIn("Heel(뒤꿈치)이 위쪽", unfold)
+
+    def test_unfold_reconstructs_unphotographed_faces(self):
+        """사진에 안 찍힌 면을 비우면 패턴의 절반이 빈 채로 나옵니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn('"reconstruct_rule"', unfold)
+        self.assertIn("좌우 반전", unfold)
+        self.assertIn("사진에 안 찍힌 면은 '비어야 할 곳'이 아니야", unfold)
+
+    def test_unfold_scopes_blankness_to_missing_fabric(self):
+        """'비워라'가 원단 없는 세 자리로 한정되어야 면 전체가 비지 않습니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("원단이 실제로 없는 자리", unfold)
+        for place in ("TONGUE(설포)", "throat", "Heel 절개"):
+            self.assertIn(place, unfold)
+
+    def test_survey_splits_unconfirmed_into_two_kinds(self):
+        """면 전체 미확인과 개별 특징 미확인을 구분해야 복원 판단이 됩니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("두 종류로 나눠서 적어", survey)
+        self.assertIn("사진 없음", survey)
 
     def test_unfold_names_view_labels_exactly(self):
         """펼치기 프롬프트가 지목하는 뷰 라벨은 VIEW_FLAGS와 한 글자도 달라선 안 됩니다."""
