@@ -153,16 +153,42 @@ class Pipeline:
     def _run_for_each(self, targets: list[Path], pipeline_result: PipelineResult) -> PipelineResult:
         """선택된 모델 폴더마다 파이프라인을 개별 실행합니다('all' 선택 또는 --shoe-image 배치)."""
         base_output_dir = self._output_handler._run_dir.parent
+        labels_seen: set[str] = set()
+
         for target in targets:
+            target_path = Path(target)
             per_steps = [dict(s) for s in self._steps]
-            # 첫 스텝의 image_path를 해당 모델 폴더로 고정
-            per_steps[0]["image_path"] = Path(target)
+
+            # 대상이 디렉터리면 그 안의 모든 이미지를 view_images로 설정합니다.
+            if target_path.is_dir():
+                image_files = ImageHandler.list_image_files(target_path, exclude_guideline=True)
+                if image_files:
+                    view_images = [(f"파일명: {f.stem}", f) for f in image_files]
+                    per_steps[0]["view_images"] = view_images
+                    per_steps[0]["image_path"] = None
+            else:
+                # 파일 타겟은 기존 방식 (image_path 설정)
+                per_steps[0]["image_path"] = target_path
+
             # 경로 stem이 뷰 플래그 이름이면 부모 폴더명을 사용합니다.
-            label = resolve_run_label_from_path(Path(target))
+            label = resolve_run_label_from_path(target_path)
+
+            # R3: 중복 라벨 감지 및 disambiguate
+            final_label = label
+            if label in labels_seen:
+                # 중복되면 stem을 추가합니다 (예: "adidas_adiracer_medial")
+                final_label = f"{label}_{target_path.stem}"
+                logger.warning(
+                    "라벨 충돌 감지 '%s' → '%s'로 disambiguate합니다",
+                    label,
+                    final_label,
+                )
+            labels_seen.add(final_label)
+
             per_pipeline = Pipeline(
                 steps=per_steps,
                 output_dir=base_output_dir,
-                run_label=label,
+                run_label=final_label,
             )
             try:
                 sub_result = per_pipeline.run(skip_initial_selection=True)
@@ -170,7 +196,7 @@ class Pipeline:
             except Exception:
                 logger.exception("모델별 파이프라인 실행 실패: %s", target)
 
-        logger.info("'all' 선택으로 인한 모델별 실행 완료")
+        logger.info("배치 실행 완료")
         return pipeline_result
 
     def run(self, skip_initial_selection: bool = False) -> PipelineResult:
