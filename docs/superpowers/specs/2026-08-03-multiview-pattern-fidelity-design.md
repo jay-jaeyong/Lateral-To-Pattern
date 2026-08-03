@@ -49,8 +49,8 @@
 |---|---|
 | `--lateral` | `바깥쪽 측면(lateral)` |
 | `--medial` | `안쪽 측면(medial)` |
-| `--front` | `앞에서 본 모습(front)` |
-| `--heel` | `뒤꿈치(heel)` |
+| `--front` | `쿼터 프론트 뷰(quarter front)` |
+| `--heel` | `쿼터 힐 뷰(quarter heel)` |
 | `--top` | `위에서 본 모습(top)` |
 | `--bottom` | `바닥(bottom)` |
 
@@ -59,6 +59,8 @@
 ```
 
 API에는 위 표 순서로 보낸다. 플래그를 준 순서와 무관하게 `lateral → medial → front → heel → top → bottom`으로 고정한다. `lateral`이 기준 사진이므로 맨 앞에 온다.
+
+`--front`와 `--heel`은 정면·정후면이 아니라 비스듬히 찍은 쿼터 뷰다. 앞(또는 뒤)과 옆면이 한 장에 같이 보이므로, 두 면이 만나는 부품 경계를 읽는 데 쓴다. 플래그 이름은 짧게 두고 라벨에서만 쿼터 뷰임을 밝힌다.
 
 `--bottom`은 밑창이라 결과 패턴에서 제외되는 부위지만, MIDSOLE 라인이 어디까지인지 판단하는 참고로 쓸 수 있어 받아둔다.
 
