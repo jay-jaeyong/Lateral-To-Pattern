@@ -63,6 +63,30 @@ CHAT_CONFIG = types.GenerateContentConfig(
 )
 
 # ─────────────────────────────────────────────
+# 스텝별 응답 모달리티 오버라이드
+# ─────────────────────────────────────────────
+def build_response_config(
+    modalities: list[str] | None,
+) -> types.GenerateContentConfig | None:
+    """스텝 하나만 다른 모달리티로 부를 때 쓸 config를 만듭니다.
+
+    관찰 스텝처럼 텍스트 응답이 필요한 경우에 씁니다.
+    None이나 빈 목록이면 None을 반환해 세션 기본값(CHAT_CONFIG)을 그대로 쓰게 합니다.
+    """
+    if not modalities:
+        return None
+
+    kwargs = {
+        "response_modalities": list(modalities),
+        "safety_settings": SAFETY_SETTINGS,
+        "temperature": 0,
+    }
+    if "IMAGE" in modalities:
+        kwargs["image_config"] = IMAGE_CONFIG
+
+    return types.GenerateContentConfig(**kwargs)
+
+# ─────────────────────────────────────────────
 # 재시도 설정
 # ─────────────────────────────────────────────
 MAX_RETRIES = 3       # API 호출 실패 시 최대 재시도 횟수
