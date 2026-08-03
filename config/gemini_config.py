@@ -13,7 +13,7 @@ from google.genai import types
 # 사용할 Gemini 모델
 # ─────────────────────────────────────────────
 # gemini-3-pro-image-preview: 이미지 생성/편집 지원 (Nano Banana Pro)
-MODEL_NAME = "gemini-3-pro-image-preview"
+MODEL_NAME = "gemini-3-pro-image"
 
 # ─────────────────────────────────────────────
 # 응답 모달리티 (이미지만 요청)

@@ -54,10 +54,10 @@ class PromptContentTest(unittest.TestCase):
     def test_unfold_keeps_every_rule_block(self):
         """규칙 블록이 통째로 사라지면 방향·솔 제외·힐 절개 같은 제약이 함께 없어집니다."""
         expected = [
-            "priority", "input", "multiview_rule", "reconstruct_rule", "pair_rule",
-            "task", "fit_rule", "exclude", "heel_rule", "part_rule", "flat_rule",
-            "task_rule", "lighting_rule", "guideline_rule", "outline_rule",
-            "empty_rule", "background_rule", "caution",
+            "priority", "input", "multiview_rule", "reconstruct_rule",
+            "count_rule", "pair_rule", "task", "fit_rule", "exclude", "heel_rule",
+            "part_rule", "flat_rule", "task_rule", "lighting_rule", "guideline_rule",
+            "outline_rule", "empty_rule", "background_rule", "caution",
         ]
         found = re.findall(r'"([a-z_]+)": \[', PIPELINE_STEPS[1]["prompt"])
         self.assertEqual(found, expected)
@@ -163,6 +163,27 @@ class PromptContentTest(unittest.TestCase):
 
     def test_line_art_cross_checks_the_survey(self):
         self.assertIn('"survey_rule"', PIPELINE_STEPS[2]["prompt"])
+
+    def test_survey_records_left_right_presence_and_counts(self):
+        """좌우 판정과 개수가 없으면 복원 단계가 몇 개를 그릴지 정하지 못합니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn('"symmetry_rule"', survey)
+        self.assertIn("'양쪽', '한쪽만(바깥쪽)', '한쪽만(안쪽)', '확인 불가'", survey)
+        self.assertIn("개수를 반드시 숫자로 적어", survey)
+
+    def test_unfold_forbids_partial_counts(self):
+        """세 줄 중 한 줄만 그리는 절충이 이번 실패의 형태였습니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn('"count_rule"', unfold)
+        self.assertIn("절충은 실패야", unfold)
+        self.assertIn("양쪽 개수가 같아야", unfold)
+
+    def test_unfold_keeps_stitched_overlays_on_the_restored_face(self):
+        """오버레이 패널을 '브랜드 표식'으로 묶으면 복원면에서 삼선이 사라집니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("구조 부품", unfold)
+        self.assertIn("복원면에서 빼지 마", unfold)
+        self.assertIn("명세서의 좌우 판정을 따라", unfold)
 
 
 if __name__ == "__main__":
