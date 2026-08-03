@@ -304,7 +304,7 @@ class Pipeline:
             try:
                 selected_files = getattr(ImageHandler, "_last_selected_files", None)
                 if selected_files and not self._run_label_forced and not self._output_handler._run_dir_created:
-                    new_label = self._output_handler._sanitize_filename(selected_files[0].stem)
+                    new_label = self._output_handler._sanitize_filename(resolve_run_label_from_path(selected_files[0]))
                     base_dir = self._output_handler._run_dir.parent
                     self._output_handler._run_label = new_label
                     self._output_handler._run_dir = base_dir / new_label

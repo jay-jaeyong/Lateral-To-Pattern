@@ -108,7 +108,13 @@ def resolve_run_label_from_path(path: Path) -> str:
 
     images/nike_v2k_run_opp1/lateral.webp → 'nike_v2k_run_opp1' (lateral 무시)
     images/nike.webp → 'nike' (뷰 플래그 아님)
+    images/lateral (directory) → 'lateral' (디렉터리면 그 이름 사용)
     """
+    # 경로가 디렉터리면 디렉터리 이름 자체를 반환합니다.
+    if path.is_dir():
+        return path.name
+
+    # 파일(또는 존재하지 않는 파일 경로)은 stem을 사용합니다.
     stem = path.stem
     flag_names = {name for name, _ in VIEW_FLAGS}
     if stem.lower() in flag_names:
