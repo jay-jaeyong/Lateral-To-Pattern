@@ -64,6 +64,22 @@ class ParseArgsTest(unittest.TestCase):
                 parse_args(["--lateral", str(self.tmp / "nope.png")])
         self.assertIn("--lateral", stderr.getvalue())
 
+    def test_missing_shoe_image_exits(self):
+        # R4/S4: --shoe-image with nonexistent path must exit
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit):
+                parse_args(["--shoe-image", str(self.tmp / "nope.png")])
+        self.assertIn("--shoe-image", stderr.getvalue())
+
+    def test_missing_guide_image_exits(self):
+        # R4/S4: --guide-image with nonexistent path must exit
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit):
+                parse_args(["--guide-image", str(self.tmp / "nope.png")])
+        self.assertIn("--guide-image", stderr.getvalue())
+
 
 class DeriveRunLabelTest(unittest.TestCase):
     def test_uses_first_entry_stem(self):
@@ -72,6 +88,20 @@ class DeriveRunLabelTest(unittest.TestCase):
 
     def test_empty_gives_none(self):
         self.assertIsNone(derive_run_label([]))
+
+    def test_view_flag_stem_uses_parent_directory(self):
+        # R5: /a/b/lateral.png should use parent directory "b"
+        views = [("바깥쪽 측면(lateral)", Path("/a/b/lateral.png"))]
+        self.assertEqual(derive_run_label(views), "b")
+
+    def test_directory_named_after_view_flag_uses_directory_name(self):
+        # R5: a directory named "lateral" should return "lateral", not parent "images"
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            lateral_dir = Path(tmp) / "lateral"
+            lateral_dir.mkdir()
+            views = [("바깥쪽 측면(lateral)", lateral_dir)]
+            self.assertEqual(derive_run_label(views), "lateral")
 
 
 class ApplyImageOverridesTest(unittest.TestCase):
