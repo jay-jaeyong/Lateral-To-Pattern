@@ -87,8 +87,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             if not Path(path_str).exists():
                 parser.error(f"--shoe-image 경로를 찾을 수 없습니다: {path_str}")
 
-    if args.guide_image and not Path(args.guide_image).exists():
-        parser.error(f"--guide-image 경로를 찾을 수 없습니다: {args.guide_image}")
+    if args.guide_image:
+        guide_path = Path(args.guide_image)
+        if not guide_path.exists():
+            parser.error(f"--guide-image 경로를 찾을 수 없습니다: {args.guide_image}")
+        # 디렉터리면 가이드라인 파일을 포함하는지 검사합니다.
+        if guide_path.is_dir():
+            from handlers.image_handler import ImageHandler
+            if not ImageHandler.find_guideline(guide_path):
+                parser.error(
+                    f"--guide-image 디렉터리에 가이드라인 파일을 찾지 못했습니다: {args.guide_image}\n"
+                    f"파일명에 '{', '.join(ImageHandler.GUIDELINE_KEYWORDS)}' 중 하나를 포함해야 합니다."
+                )
 
     return args
 
