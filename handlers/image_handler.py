@@ -234,25 +234,28 @@ class ImageHandler:
 
         max_images가 주어지면 정렬 순서 기준 앞에서 그 장수만 사용합니다.
         """
+        from utils.cli import label_image_files
+
         image_files = ImageHandler.list_image_files(folder)
         if not image_files:
             logger.info("폴더에 이미지 없음: %s — 프롬프트만으로 진행합니다.", folder)
             return [prompt]
 
-        if max_images is not None and len(image_files) > max_images:
+        # 파일명이 뷰 이름이면 정식 라벨을 붙이고 VIEW_FLAGS 순서로 정렬합니다.
+        # 정렬을 먼저 해야 max_images로 잘라도 기준 사진(lateral)이 남습니다.
+        labeled = label_image_files(image_files)
+
+        if max_images is not None and len(labeled) > max_images:
             logger.info(
                 "폴더 '%s'의 이미지 %d장 중 앞 %d장만 사용합니다: %s",
                 folder.name,
-                len(image_files),
+                len(labeled),
                 max_images,
-                ", ".join(f.name for f in image_files[:max_images]),
+                ", ".join(f.name for _label, f in labeled[:max_images]),
             )
-            image_files = image_files[:max_images]
+            labeled = labeled[:max_images]
 
-        # 폴더 방식은 뷰 종류를 알 수 없으므로 파일명을 라벨로 넘겨 모델이 판단하게 합니다.
-        parts = ImageHandler.build_labeled_parts(
-            [(f"파일명: {f.stem}", f) for f in image_files], prompt
-        )
+        parts = ImageHandler.build_labeled_parts(labeled, prompt)
         loaded = (len(parts) - 1) // 2
         logger.info("폴더 '%s'에서 이미지 %d장 로드 완료", folder.name, loaded)
         return parts

@@ -113,6 +113,25 @@ def collect_view_images(args: argparse.Namespace) -> list[tuple[str, Path]]:
     return collected
 
 
+def label_image_files(paths: list[Path]) -> list[tuple[str, Path]]:
+    """이미지 파일 목록을 (라벨, 경로)로 만들고 VIEW_FLAGS 순서로 정렬합니다.
+
+    파일명 stem이 뷰 플래그 이름과 같으면 그 뷰의 정식 라벨을 붙입니다. 그래야
+    프롬프트가 '바깥쪽 측면(lateral)'으로 기준 사진을 지목할 수 있고, 쿼터 뷰
+    설명도 걸립니다. 뷰 이름이 아닌 파일은 '파일명: <stem>' 라벨로 뒤에 붙습니다.
+    """
+    labels = dict(VIEW_FLAGS)
+    order = {name: index for index, (name, _label) in enumerate(VIEW_FLAGS)}
+
+    def sort_key(path: Path) -> tuple[int, str]:
+        return (order.get(path.stem.lower(), len(VIEW_FLAGS)), path.name)
+
+    return [
+        (labels.get(path.stem.lower(), f"파일명: {path.stem}"), path)
+        for path in sorted(paths, key=sort_key)
+    ]
+
+
 def resolve_run_label_from_path(path: Path) -> str:
     """경로의 stem이 뷰 플래그 이름이면 부모 디렉터리 이름을 반환합니다.
 

@@ -25,7 +25,7 @@ from services.gemini_client import GeminiClient
 from handlers.image_handler import ImageHandler
 from handlers.output_handler import OutputHandler
 from utils.logging_utils import step_context
-from utils.cli import resolve_run_label_from_path
+from utils.cli import label_image_files, resolve_run_label_from_path
 from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
@@ -162,10 +162,13 @@ class Pipeline:
             # 대상이 디렉터리면 그 안의 모든 이미지를 view_images로 설정합니다.
             if target_path.is_dir():
                 image_files = ImageHandler.list_image_files(target_path, exclude_guideline=True)
-                if image_files:
-                    view_images = [(f"파일명: {f.stem}", f) for f in image_files]
-                    per_steps[0]["view_images"] = view_images
-                    per_steps[0]["image_path"] = None
+                if not image_files:
+                    # 여기서 넘어가지 않고 진행하면 image_path가 기본 폴더로 남아
+                    # 이 폴더 이름을 단 출력에 다른 신발 사진이 들어갑니다.
+                    logger.warning("사용할 이미지가 없어 건너뜁니다: %s", target_path)
+                    continue
+                per_steps[0]["view_images"] = label_image_files(image_files)
+                per_steps[0]["image_path"] = None
             else:
                 # 파일 타겟은 기존 방식 (image_path 설정)
                 per_steps[0]["image_path"] = target_path
@@ -173,16 +176,17 @@ class Pipeline:
             # 경로 stem이 뷰 플래그 이름이면 부모 폴더명을 사용합니다.
             label = resolve_run_label_from_path(target_path)
 
-            # R3: 중복 라벨 감지 및 disambiguate
+            # 라벨이 겹치면 출력 폴더가 서로를 덮어쓰므로 유일해질 때까지 바꿉니다.
             final_label = label
-            if label in labels_seen:
-                # 중복되면 stem을 추가합니다 (예: "adidas_adiracer_medial")
+            if final_label in labels_seen:
+                # 먼저 stem을 붙여보고(예: "adidas_adiracer_medial"),
+                # 그래도 겹치면 번호를 올립니다.
                 final_label = f"{label}_{target_path.stem}"
-                logger.warning(
-                    "라벨 충돌 감지 '%s' → '%s'로 disambiguate합니다",
-                    label,
-                    final_label,
-                )
+                suffix = 2
+                while final_label in labels_seen:
+                    final_label = f"{label}_{target_path.stem}_{suffix}"
+                    suffix += 1
+                logger.warning("라벨 충돌 '%s' → '%s'로 바꿉니다", label, final_label)
             labels_seen.add(final_label)
 
             per_pipeline = Pipeline(
