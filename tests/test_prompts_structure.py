@@ -193,6 +193,25 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("순백(#FFFFFF)", unfold)
         self.assertIn("원래 박혀 있는 로고와 글자는 실물의 일부", unfold)
 
+    def test_survey_judges_thread_colour_per_seam(self):
+        """한 부위가 흰색 실이라고 전체를 흰색으로 일반화하면 톤온톤 스티치를 놓칩니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("실 색은 재봉선마다 따로 판정해", survey)
+        self.assertIn("톤온톤", survey)
+
+    def test_survey_sweeps_low_contrast_features(self):
+        """음각 로고처럼 바탕과 같은 색인 특징은 따로 찾으라고 해야 찾습니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn('"lowcontrast_rule"', survey)
+        self.assertIn("음각", survey)
+        self.assertIn("안 보인다고 없다고 단정하지 마", survey)
+
+    def test_survey_unifies_only_repeated_instances(self):
+        """반복 조각은 통일하되 다른 부품끼리 통일하면 이번 같은 오류가 납니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("통일은 같은 부품의 반복 조각에만 적용해", survey)
+        self.assertIn("서로 다른 부품끼리는 통일하지 마", survey)
+
 
 if __name__ == "__main__":
     unittest.main()
