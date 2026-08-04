@@ -319,3 +319,27 @@ class TopViewAndEyestayTest(unittest.TestCase):
         self.assertIn('"eyestay_rule"', survey)
         self.assertIn("주변 갑피와 같은 재질이라고 넘겨짚지 마", survey)
         self.assertIn("정면으로 보이는 사진", survey)
+
+
+class SurveyPriorityTest(unittest.TestCase):
+    """전역 재질 통일 규칙이 부위별 판정을 덮어써 은색이 번졌습니다."""
+
+    def test_survey_has_a_priority_block_first(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn('"priority"', survey)
+        blocks = re.findall(r'"([a-z_]+)":\s*\[', survey)
+        self.assertEqual(blocks[0], "priority")
+
+    def test_region_rules_outrank_view_rules_outrank_global(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        for rank, names in (
+            ("1순위", "eyestay_rule"),
+            ("2순위", "top_view_rule"),
+            ("3순위", "material_rule"),
+        ):
+            self.assertIn(rank, survey)
+            self.assertIn(names, survey)
+        self.assertIn("주변 부품까지 같은 재질로 번지게 하지 마", survey)
+
+    def test_top_view_defers_eyestay_material_to_its_own_rule(self):
+        self.assertIn("아이스테이)의 재질은 eyestay_rule을 따라", PIPELINE_STEPS[0]["prompt"])
