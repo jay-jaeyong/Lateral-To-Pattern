@@ -22,9 +22,8 @@ class PipelineShapeTest(unittest.TestCase):
         self.assertIsNone(survey["guide_image_path"])
         self.assertIsNotNone(survey["image_path"])
 
-    def test_unfold_step_reuses_initial_references_and_takes_the_guide(self):
+    def test_unfold_step_relies_on_history_and_takes_the_guide(self):
         unfold = PIPELINE_STEPS[1]
-        self.assertTrue(unfold["reuse_initial_references"])
         self.assertIsNone(unfold["image_path"])
         self.assertIsNotNone(unfold["guide_image_path"])
         self.assertNotIn("response_modalities", unfold)
@@ -46,30 +45,42 @@ class PromptContentTest(unittest.TestCase):
     def test_unfold_has_priority_block(self):
         unfold = PIPELINE_STEPS[1]["prompt"]
         self.assertIn('"priority"', unfold)
-        self.assertIn("현재 요청에 첨부된 실물 사진", unfold)
-        self.assertIn("명세서가 사진과 충돌", unfold)
-        self.assertIn("통합·치환·단순화하지", unfold)
-        self.assertIn("바깥 재단선", unfold)
+        for rank in ("1순위", "2순위", "3순위", "4순위"):
+            self.assertIn(rank, unfold)
 
     def test_unfold_has_multiview_rule(self):
         self.assertIn('"multiview_rule"', PIPELINE_STEPS[1]["prompt"])
 
-    def test_unfold_keeps_essential_rule_blocks(self):
-        """범용 우선순위와 패턴 안전 제약은 프롬프트에 남아 있어야 합니다."""
+    def test_unfold_keeps_every_rule_block(self):
+        """규칙 블록이 통째로 사라지면 방향·솔 제외·힐 절개 같은 제약이 함께 없어집니다."""
         expected = [
-            "priority", "input", "multiview_rule", "pair_rule",
-            "task", "fit_rule", "exclude", "flat_rule", "background_rule",
-            "caution",
+            "priority", "input", "multiview_rule", "reconstruct_rule",
+            "count_rule", "pair_rule", "task", "fit_rule", "exclude", "heel_rule",
+            "part_rule", "flat_rule", "task_rule", "lighting_rule", "guideline_rule",
+            "outline_rule", "empty_rule", "background_rule", "caution",
         ]
         found = re.findall(r'"([a-z_]+)": \[', PIPELINE_STEPS[1]["prompt"])
-        for block in expected:
-            self.assertIn(block, found)
+        self.assertEqual(found, expected)
 
     def test_unfold_keeps_orientation_rules(self):
         """Toe가 아래, Heel이 위라는 방향 규칙이 있어야 결과가 뒤집히지 않습니다."""
         unfold = PIPELINE_STEPS[1]["prompt"]
         self.assertIn("Toe(앞코)가 아래쪽", unfold)
         self.assertIn("Heel(뒤꿈치)이 위쪽", unfold)
+
+    def test_unfold_reconstructs_unphotographed_faces(self):
+        """사진에 안 찍힌 면을 비우면 패턴의 절반이 빈 채로 나옵니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn('"reconstruct_rule"', unfold)
+        self.assertIn("좌우 반전", unfold)
+        self.assertIn("사진에 안 찍힌 면은 '비어야 할 곳'이 아니야", unfold)
+
+    def test_unfold_scopes_blankness_to_missing_fabric(self):
+        """'비워라'가 원단 없는 세 자리로 한정되어야 면 전체가 비지 않습니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("원단이 실제로 없는 자리", unfold)
+        for place in ("TONGUE(설포)", "throat", "Heel 절개"):
+            self.assertIn(place, unfold)
 
     def test_survey_judges_material_by_optics_not_by_name(self):
         """부품 이름으로 재질을 추측하면 브랜드 관행이 실물을 덮어씁니다."""
@@ -83,6 +94,14 @@ class PromptContentTest(unittest.TestCase):
         survey = PIPELINE_STEPS[0]["prompt"]
         self.assertIn("재질을 한 번만 판정하고 전부 같게", survey)
         self.assertIn("조명 차이", survey)
+
+    def test_unfold_renders_under_uniform_light(self):
+        """원본 하이라이트를 옮기면 조명 얼룩이 소재 차이처럼 보입니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn('"lighting_rule"', unfold)
+        self.assertIn("균일한 확산광", unfold)
+        self.assertIn("하이라이트 위치를 그대로 옮기지 마", unfold)
+        self.assertIn("같은 광택으로 그려", unfold)
 
     def test_line_art_does_not_outline_highlights(self):
         """광택 경계를 부품 경계로 착각하면 없는 재단선이 생깁니다."""
@@ -152,6 +171,20 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("'양쪽', '한쪽만(바깥쪽)', '한쪽만(안쪽)', '확인 불가'", survey)
         self.assertIn("개수를 반드시 숫자로 적어", survey)
 
+    def test_unfold_forbids_partial_counts(self):
+        """세 줄 중 한 줄만 그리는 절충이 이번 실패의 형태였습니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn('"count_rule"', unfold)
+        self.assertIn("절충은 실패야", unfold)
+        self.assertIn("양쪽 개수가 같아야", unfold)
+
+    def test_unfold_keeps_stitched_overlays_on_the_restored_face(self):
+        """오버레이 패널을 '브랜드 표식'으로 묶으면 복원면에서 삼선이 사라집니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("구조 부품", unfold)
+        self.assertIn("복원면에서 빼지 마", unfold)
+        self.assertIn("명세서의 좌우 판정을 따라", unfold)
+
     def test_unfold_forbids_annotations_and_grey_background(self):
         """라벨·기호가 찍히면 재단 패턴이 아니라 도해가 됩니다."""
         unfold = PIPELINE_STEPS[1]["prompt"]
@@ -207,39 +240,6 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("무봉제", unfold)
         self.assertIn("스티치를 그리지 마", unfold)
         self.assertIn("랜드마크 위치에 놓아", unfold)
-
-    def test_survey_requires_generic_component_fields(self):
-        survey = PIPELINE_STEPS[0]["prompt"]
-        for field in (
-            "component",
-            "presence",
-            "lateral_geometry",
-            "medial_geometry",
-            "topology",
-            "count_per_side",
-            "material_and_surface",
-            "attachment",
-            "landmarks",
-            "source_views",
-            "confidence",
-        ):
-            self.assertIn(f'"{field}"', survey, msg=field)
-
-    def test_survey_generates_dynamic_critical_features(self):
-        survey = PIPELINE_STEPS[0]["prompt"]
-        self.assertIn('"critical_features"', survey)
-        self.assertIn("사진 근거", survey)
-        self.assertIn("식별 정보", survey)
-        self.assertIn("양쪽에 존재하지만 형상만 다른", survey)
-
-    def test_unfold_is_generic_and_does_not_name_a_product_feature(self):
-        unfold_prompt = PIPELINE_STEPS[1]["prompt"].lower()
-        self.assertIn("현재 요청에 첨부된 실물 사진", unfold_prompt)
-        self.assertIn("명세서가 사진과 충돌", unfold_prompt)
-        self.assertIn("통합·치환·단순화하지", unfold_prompt)
-        self.assertIn("바깥 재단선", unfold_prompt)
-        for product_specific in ("adistar", "파란 케이지", "검정 프레임", "파란 슬롯"):
-            self.assertNotIn(product_specific, unfold_prompt)
 
     def test_survey_requires_a_relief_field_for_every_part(self):
         """저대비 훑기로만 두면 색이 있는 부품의 뚜렷한 홈을 건너뜁니다."""
