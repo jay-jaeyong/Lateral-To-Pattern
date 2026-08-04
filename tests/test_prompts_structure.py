@@ -267,3 +267,16 @@ class HeelViewRuleTest(unittest.TestCase):
         survey = PIPELINE_STEPS[0]["prompt"]
         self.assertIn("원근에 눌려서", survey)
         self.assertIn("뒤축 중심선", survey)
+
+
+class MidsoleBoundaryTest(unittest.TestCase):
+    def test_metallic_sole_sections_are_excluded(self):
+        """솔의 은색 마감 구간을 Upper 오버레이로 기록해 패턴에 섞였습니다."""
+        for index in (0, 1):
+            prompt = PIPELINE_STEPS[index]["prompt"]
+            self.assertIn("은색·금속 광택", prompt, msg=PIPELINE_STEPS[index]["name"])
+
+    def test_survey_defines_where_the_midsole_line_is(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("거품·고무 솔이 끝나고 원단·오버레이가 시작되는 경계", survey)
+        self.assertIn("솔 몰딩과 한 덩어리로 이어지는지", survey)
