@@ -270,21 +270,15 @@ class HeelViewRuleTest(unittest.TestCase):
 
 
 class MidsoleBoundaryTest(unittest.TestCase):
-    def test_sole_is_judged_by_construction_not_colour(self):
-        """색으로 가르면 원단에 스티치로 붙은 은색 Upper 부품까지 빠집니다."""
+    def test_sole_is_judged_by_construction(self):
+        """겉보기로 가르면 원단에 붙은 Upper 부품까지 솔로 빠집니다."""
         survey = PIPELINE_STEPS[0]["prompt"]
-        self.assertIn("색이 아니라 두 가지로 판정해", survey)
-        self.assertIn("솔 몰딩과 한 덩어리로 이어져 있으면 솔", survey)
-        self.assertIn("재봉선이나 열접착 경계가 보이면 Upper", survey)
+        self.assertIn("접합 구조로 판정해", survey)
+        self.assertIn("솔 몸체와 한 덩어리로 성형돼 있으면 솔", survey)
+        self.assertIn("재봉선이나 접착 경계가 보이면 Upper", survey)
 
-    def test_same_colour_parts_can_straddle_the_midsole_line(self):
-        survey = PIPELINE_STEPS[0]["prompt"]
-        self.assertIn("MIDSOLE 라인 위아래에 하나씩", survey)
-
-    def test_unfold_keeps_stitched_metallic_upper_parts(self):
-        unfold = PIPELINE_STEPS[1]["prompt"]
-        self.assertIn("은색이어도 Upper야", unfold)
-        self.assertIn("색만 보고 빼지 마", unfold)
+    def test_unfold_defers_the_sole_call_to_the_survey(self):
+        self.assertIn("여기서 다시 판정하지 마", PIPELINE_STEPS[1]["prompt"])
 
     def test_survey_defines_where_the_midsole_line_is(self):
         survey = PIPELINE_STEPS[0]["prompt"]
