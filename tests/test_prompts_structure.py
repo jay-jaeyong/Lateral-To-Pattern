@@ -169,7 +169,9 @@ class PromptContentTest(unittest.TestCase):
         survey = PIPELINE_STEPS[0]["prompt"]
         self.assertIn('"symmetry_rule"', survey)
         self.assertIn("'중앙(좌우 구분 없음)'", survey)
-        self.assertIn("다섯 중 하나로 적어", survey)
+        # 대칭성 카테고리는 이제 response_schema(Survey)로 기계적으로 강제됩니다.
+        # 프롬프트의 중복 나열 대신 schema 검증을 사용합니다.
+        self.assertIn("response_schema", str(PIPELINE_STEPS[0]))
         self.assertIn("개수를 반드시 숫자로 적어", survey)
 
     def test_unfold_forbids_partial_counts(self):

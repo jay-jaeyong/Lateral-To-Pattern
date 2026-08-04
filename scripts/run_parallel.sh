@@ -10,6 +10,7 @@ cd "$(dirname "$0")/.."
 PY=.venv/bin/python
 RUNS=${RUNS:-2}          # 모델당 실행 횟수
 JOBS=${JOBS:-4}          # 동시에 돌릴 모델 수
+VER=${VER:-v6}           # 출력 폴더 접미사. RUNS=1이면 {모델}_{VER}, 아니면 {모델}_{VER}-N
 LOG_DIR=output/_runlogs
 mkdir -p "$LOG_DIR"
 
@@ -33,7 +34,7 @@ run_model() {
 
     local n label
     for n in $(seq 1 "$RUNS"); do
-        label="${m}_v6-${n}"
+        if [ "$RUNS" -eq 1 ]; then label="${m}_${VER}"; else label="${m}_${VER}-${n}"; fi
         if $PY main.py --run-label "$label" "${args[@]}" > "$LOG_DIR/${label}.log" 2>&1; then
             echo "OK   $label"
         else
@@ -48,7 +49,7 @@ if [ ${#models[@]} -eq 0 ]; then
     exit 1
 fi
 
-echo "START ${#models[@]}개 모델 × ${RUNS}회, 동시 ${JOBS}개"
+echo "START ${#models[@]}개 모델 × ${RUNS}회, 동시 ${JOBS}개, 접미사 ${VER}"
 for m in "${models[@]}"; do
     while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do
         wait -n 2>/dev/null || sleep 1

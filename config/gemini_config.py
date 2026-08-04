@@ -70,11 +70,16 @@ CHAT_CONFIG = types.GenerateContentConfig(
 # ─────────────────────────────────────────────
 def build_response_config(
     modalities: list[str] | None,
+    response_schema=None,
 ) -> types.GenerateContentConfig | None:
     """스텝 하나만 다른 모달리티로 부를 때 쓸 config를 만듭니다.
 
     관찰 스텝처럼 텍스트 응답이 필요한 경우에 씁니다.
     None이나 빈 목록이면 None을 반환해 세션 기본값(CHAT_CONFIG)을 그대로 쓰게 합니다.
+
+    Args:
+        modalities: 응답 모달리티 (예: ["TEXT"], ["IMAGE"], None)
+        response_schema: Pydantic 모델. 지정하면 응답이 해당 모델의 JSON 스키마로 강제됩니다.
     """
     if not modalities:
         return None
@@ -86,6 +91,9 @@ def build_response_config(
     }
     if "IMAGE" in modalities:
         kwargs["image_config"] = IMAGE_CONFIG
+    if response_schema is not None:
+        kwargs["response_mime_type"] = "application/json"
+        kwargs["response_schema"] = response_schema
 
     return types.GenerateContentConfig(**kwargs)
 

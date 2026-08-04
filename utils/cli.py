@@ -204,10 +204,22 @@ def apply_image_overrides(
         updated[0]["image_path"] = Path(first)
 
     if guide_image:
+        from handlers.image_handler import ImageHandler
+
+        guide_path = Path(guide_image)
+
+        # 디렉터리면 가이드라인 파일로 해석합니다. 파일이면 그대로 사용합니다.
+        # 이렇게 먼저 해석하면 Step 2는 런타임에 폴더를 검색할 필요가 없습니다.
+        if guide_path.is_dir():
+            found = ImageHandler.find_guideline(guide_path)
+            if found:
+                guide_path = found
+            # found가 None이어도 값을 덮어써야 합니다. 이후 loader가 경고할 겁니다.
+
         # 가이드라인을 실제로 쓰는 스텝에만 덮어씁니다. 첫 스텝(관찰)은
         # guide_image_path가 None이라 여기에 넣으면 관찰 대상에 틀이 섞입니다.
         for step_config in updated:
             if step_config.get("guide_image_path") is not None:
-                step_config["guide_image_path"] = Path(guide_image)
+                step_config["guide_image_path"] = guide_path
 
     return updated

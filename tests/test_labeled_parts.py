@@ -132,16 +132,18 @@ class GuideLabelTest(unittest.TestCase):
         from core._parts_builder import GUIDE_LABEL
 
         guide_dir = self.tmp / "guides"
-        guide_dir.mkdir()
-        make_png(guide_dir / "가이드라인.png")
+        guide_dir.mkdir(parents=True)
+        guide_file = make_png(guide_dir / "가이드라인.png")
 
+        # Step 2는 CLI 계층에서 미리 해석된 파일 경로를 받습니다.
+        # 디렉터리가 아니라 명시적 파일 경로를 전달합니다.
         parts = build_step_parts(
             step_num=2,
             prompt="PROMPT",
             image_path=None,
             prev_images=[],
             prev_texts=[],
-            guide_image_path=guide_dir,
+            guide_image_path=guide_file,
         )
         self.assertIn(GUIDE_LABEL, parts)
         # "[사진 N]" 번호 형식이면 안 됩니다. 설명 문구에 '사진'이 들어가는 건 무방합니다.

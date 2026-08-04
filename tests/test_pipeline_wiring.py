@@ -205,7 +205,7 @@ class ReferenceViewTest(unittest.TestCase):
         Pipeline(steps=steps, output_dir=Path(self._out.name), run_label="t").run()
         return sent
 
-    def test_step2_receives_the_lateral_photo_again(self):
+    def test_step2_receives_both_side_photos_again(self):
         labels = dict(VIEW_FLAGS)
         with tempfile.TemporaryDirectory() as tmp:
             lat, med = Path(tmp) / "lateral.png", Path(tmp) / "medial.png"
@@ -216,8 +216,12 @@ class ReferenceViewTest(unittest.TestCase):
         step2 = sent[1]
         self.assertEqual(step2[0], f"[{labels['lateral']}]")
         self.assertIsInstance(step2[1], Image.Image)
-        # 요청한 뷰만 다시 들어옵니다: lateral 한 장 + 가이드라인 한 장.
-        self.assertEqual(sum(1 for p in step2 if isinstance(p, Image.Image)), 2)
+        # 두 면을 서로 다르게 그리려면 Step 2가 두 면을 다 봐야 합니다.
+        # 라벨은 reference_views 순서대로 붙습니다.
+        self.assertEqual(step2[2], f"[{labels['medial']}]")
+        self.assertIsInstance(step2[3], Image.Image)
+        # 요청한 뷰 두 장 + 가이드라인 한 장.
+        self.assertEqual(sum(1 for p in step2 if isinstance(p, Image.Image)), 3)
 
     def test_missing_lateral_does_not_break_the_run(self):
         with tempfile.TemporaryDirectory() as tmp:

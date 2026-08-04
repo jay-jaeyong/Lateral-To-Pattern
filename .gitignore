@@ -23,6 +23,8 @@ env/
 output/
 # 이미지 생성 폴더
 images/
+# images/가이드라인.jpg에서 파생된 표시본 (scripts/mark_guideline.py로 재생성)
+guides/
 
 # IDE
 .vscode/settings.json

@@ -133,7 +133,7 @@ class Pipeline:
         """모델명이 정해졌다면 이미지 경로를 해당 모델 서브폴더로 좁힙니다.
 
         첫 스텝의 image_path는 이미 선택이 끝났으므로 건드리지 않습니다.
-        가이드라인은 모델 서브폴더에 실제로 있을 때만 좁힙니다.
+        가이드라인 경로는 런타임에 변경되지 않습니다 (미리 해석되어 있음).
         """
         if not model_name:
             return config
@@ -142,15 +142,6 @@ class Pipeline:
 
         if not is_first and config.get("image_path") is not None:
             resolved["image_path"] = self._resolve_model_subdir(Path(config["image_path"]), model_name)
-
-        if config.get("guide_image_path") is not None:
-            # 모델 서브폴더에서 가이드라인을 찾아봅니다.
-            base_guide_path = Path(config["guide_image_path"])
-            model_subdir = self._resolve_model_subdir(base_guide_path, model_name, fallback_to_first=False)
-            # 모델 서브폴더에 실제로 가이드라인이 있으면 그것을 사용하고, 없으면 원래 경로를 유지합니다.
-            if model_subdir != base_guide_path and ImageHandler.find_guideline(model_subdir):
-                resolved["guide_image_path"] = model_subdir
-            # 원래 경로도 확인 (없으면 그대로)
 
         return resolved
 
@@ -408,8 +399,9 @@ class Pipeline:
             # Gemini API 호출 → 텍스트 + 생성 이미지
             # 관찰 스텝처럼 텍스트 응답이 필요한 단계만 모달리티를 바꿔 부릅니다.
             response_modalities = config.get("response_modalities")
+            response_schema = config.get("response_schema")
             step_response: StepResponse = self._client.send(
-                parts, config=build_response_config(response_modalities)
+                parts, config=build_response_config(response_modalities, response_schema=response_schema)
             )
 
             if response_modalities and "TEXT" in response_modalities and not step_response.text:

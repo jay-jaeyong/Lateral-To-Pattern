@@ -13,6 +13,7 @@ from pathlib import Path
 from PIL import Image
 
 from config.prompts import PIPELINE_STEPS
+from core._parts_builder import _load_guide_images
 from utils.cli import apply_image_overrides, guide_path_problem, parse_args
 
 
@@ -99,6 +100,93 @@ class ParseArgsGuideValidationTest(unittest.TestCase):
         make_png(folder / "guideline.png")
         args, _err = self.parse(["--guide-image", str(folder)])
         self.assertIsNotNone(args)
+
+
+class LoadGuideImagesTest(unittest.TestCase):
+    """_load_guide_images는 파일만 허용하고 폴더는 거부합니다."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_rejects_directory_with_guideline_keyword(self):
+        # 회귀 방지: 과거에는 폴더에서 가이드라인을 찾아 사용했습니다.
+        # 이제는 폴더가 주어지면 경고하고 []를 반환합니다.
+        folder = self.tmp / "guides"
+        make_png(folder / "가이드라인.png")
+        result = _load_guide_images(folder)
+        self.assertEqual(result, [])
+
+    def test_loads_explicit_file(self):
+        # 파일 경로가 주어지면 그 파일을 로드합니다.
+        guide_file = make_png(self.tmp / "guides" / "가이드라인.png")
+        result = _load_guide_images(guide_file)
+        self.assertEqual(len(result), 1)
+        # Image.Image 객체인지 확인합니다.
+        from PIL.Image import Image as PILImage
+        self.assertIsInstance(result[0], PILImage)
+
+    def test_returns_empty_for_missing_file(self):
+        # 파일이 없으면 []를 반환합니다.
+        missing = self.tmp / "nope.png"
+        result = _load_guide_images(missing)
+        self.assertEqual(result, [])
+
+
+class ApplyImageOverridesGuideResolutionTest(unittest.TestCase):
+    """apply_image_overrides는 디렉터리 가이드라인을 파일로 해석합니다."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_directory_override_resolves_to_file(self):
+        # 디렉터리를 guide_image로 주면 그 안의 가이드라인 파일로 해석합니다.
+        folder = self.tmp / "guides"
+        guide_file = make_png(folder / "가이드라인.png")
+        steps = apply_image_overrides(PIPELINE_STEPS, guide_image=str(folder))
+        by_name = {step["name"]: step for step in steps}
+        result = by_name["pattern_unfold"]["guide_image_path"]
+        # 결과는 파일 경로여야 합니다.
+        self.assertTrue(result.is_file() if result.exists() else result.suffix != "")
+
+    def test_file_override_passes_through_unchanged(self):
+        # 파일을 guide_image로 주면 그대로 사용합니다.
+        guide_file = make_png(self.tmp / "가이드라인.png")
+        steps = apply_image_overrides(PIPELINE_STEPS, guide_image=str(guide_file))
+        by_name = {step["name"]: step for step in steps}
+        result = by_name["pattern_unfold"]["guide_image_path"]
+        self.assertEqual(result, guide_file)
+
+
+class DefaultGuidelineIsFilepathTest(unittest.TestCase):
+    """PIPELINE_STEPS의 Step 2 가이드라인이 파일 경로임을 확인합니다."""
+
+    def test_step_2_guideline_is_file_path(self):
+        # 기본 가이드라인은 파일 경로여야 합니다.
+        steps = PIPELINE_STEPS
+        by_name = {step["name"]: step for step in steps}
+        guide_path = by_name["pattern_unfold"]["guide_image_path"]
+        self.assertIsNotNone(guide_path)
+        path = Path(guide_path) if isinstance(guide_path, str) else guide_path
+        # 파일 경로인지 확인: suffix가 있어야 함 (확장자가 있어야 함)
+        self.assertNotEqual(path.suffix, "", f"Expected file path with extension, got: {path}")
+
+
+class PipelineWiringGuideTest(unittest.TestCase):
+    """Step 2가 가이드라인 + 기준 사진 2개를 받는지 확인합니다."""
+
+    def test_step_2_gets_labeled_parts(self):
+        # Step 2는 reference_views가 설정되어 있어야 합니다.
+        by_name = {step["name"]: step for step in PIPELINE_STEPS}
+        step_2 = by_name["pattern_unfold"]
+        # reference_views가 설정되어 있는지 확인합니다.
+        self.assertIn("reference_views", step_2)
+        # lateral과 medial이 모두 들어가 있는지 확인합니다.
+        self.assertIn("lateral", step_2["reference_views"])
+        self.assertIn("medial", step_2["reference_views"])
 
 
 if __name__ == "__main__":
