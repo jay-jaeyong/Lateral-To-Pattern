@@ -304,3 +304,18 @@ class UpperOnlySurveyTest(unittest.TestCase):
         survey = PIPELINE_STEPS[0]["prompt"]
         self.assertIn("명세서에는 Upper 부품만 적어", survey)
         self.assertIn("'제외함'이라고 적지도 마", survey)
+
+
+class TopViewAndEyestayTest(unittest.TestCase):
+    def test_survey_reads_the_instep_from_the_top_photo(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn('"top_view_rule"', survey)
+        self.assertIn("바로 위에서 수직으로 내려다본 것인지", survey)
+        self.assertIn("발등 중심선", survey)
+
+    def test_survey_judges_the_eyestay_material_separately(self):
+        """옆에서 보면 아이스테이가 비스듬해 광택이 죽어 보여 흰색으로 기록됐습니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn('"eyestay_rule"', survey)
+        self.assertIn("주변 갑피와 같은 재질이라고 넘겨짚지 마", survey)
+        self.assertIn("정면으로 보이는 사진", survey)
