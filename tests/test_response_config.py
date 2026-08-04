@@ -59,3 +59,11 @@ class SendPassesConfigTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AspectRatioTest(unittest.TestCase):
+    def test_output_is_locked_to_portrait(self):
+        """비율을 비워두면 모델이 가로를 골라 방향 규칙이 깨집니다."""
+        from config.gemini_config import IMAGE_CONFIG
+
+        self.assertEqual(IMAGE_CONFIG.aspect_ratio, "2:3")
