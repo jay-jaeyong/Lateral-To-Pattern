@@ -177,7 +177,7 @@ class PromptContentTest(unittest.TestCase):
         unfold = PIPELINE_STEPS[1]["prompt"]
         self.assertIn('"count_rule"', unfold)
         self.assertIn("절충은 실패야", unfold)
-        self.assertIn("양쪽 개수가 같아야", unfold)
+        self.assertIn("좌우 개수가 같아야", unfold)
 
     def test_unfold_keeps_stitched_overlays_on_the_restored_face(self):
         """오버레이 패널을 '브랜드 표식'으로 묶으면 복원면에서 삼선이 사라집니다."""
@@ -381,3 +381,64 @@ class LabelFormatTest(unittest.TestCase):
     def test_survey_says_the_label_does_not_reveal_the_angle_kind(self):
         self.assertIn("정면인지 비스듬한 쿼터 뷰인지는 알려주지 않으니",
                       PIPELINE_STEPS[0]["prompt"])
+
+
+class HeelSplitContentTest(unittest.TestCase):
+    """뒤축 중앙 로고가 양쪽에 온전히 복제되던 문제 — 가장 빈번한 결함이었습니다."""
+
+    def test_heel_ends_are_halves_not_copies(self):
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("한 부위를 반으로 자른 두 조각", unfold)
+        self.assertIn("복사본이 아니야", unfold)
+
+    def test_back_centre_marks_are_split_in_half(self):
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("반씩 갈려", unfold)
+        self.assertIn("온전한 로고를 두 번 그리면 실패", unfold)
+
+    def test_each_side_of_the_cut_belongs_to_one_face(self):
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("절개선 한쪽은 바깥쪽 면으로, 반대쪽은 안쪽 면으로 이어져", unfold)
+
+    def test_old_identical_wording_is_gone(self):
+        """'두 Heel 끝이 똑같아야 해'가 복제를 지시하고 있었습니다."""
+        self.assertNotIn("재질·무늬·높이가 똑같아야 해", PIPELINE_STEPS[1]["prompt"])
+
+
+class TrainingPriorTest(unittest.TestCase):
+    def test_unfold_forbids_borrowing_from_remembered_models(self):
+        """asics에서 학습한 인기 모델 특징이 결과물에 나타났습니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("네가 아는 유명 모델의 생김새를 가져오면 실패야", unfold)
+        self.assertIn("다른 인기 모델과 닮게 만들지 마", unfold)
+
+
+class SideViewRuleTest(unittest.TestCase):
+    def test_survey_has_both_side_view_rules(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn('"lateral_view_rule"', survey)
+        self.assertIn('"medial_view_rule"', survey)
+
+    def test_side_rules_demand_explicit_difference_extraction(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertEqual(survey.count("나란히 놓고 비교해서"), 2)
+        self.assertEqual(survey.count("'차이 없음'이라고 적어"), 2)
+
+    def test_side_rules_are_listed_in_priority(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("lateral_view_rule, medial_view_rule", survey)
+
+    def test_mirror_fallback_only_when_medial_is_missing(self):
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("medial 사진이 있으면 반전 복원을 쓰지 마", unfold)
+        self.assertNotIn("신발은 중심선 기준으로 거의 대칭이야", unfold)
+
+    def test_count_equality_is_scoped_to_parts_found_on_both_sides(self):
+        """삼선이 한쪽만 세 줄로 나오던 실패를 막는 규칙은 남기되 범위를 좁힙니다."""
+        unfold = PIPELINE_STEPS[1]["prompt"]
+        self.assertIn("명세서가 '양쪽'으로 판정한 요소는 좌우 개수가 같아야 해", unfold)
+        self.assertIn("'한쪽만'으로 판정한 요소는 그 한쪽에만 그려", unfold)
+
+    def test_symmetry_rule_records_shape_differences_too(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("두 면의 모양이 같은지 다른지 함께 적어", survey)
