@@ -21,6 +21,10 @@ from handlers.image_handler import ImageHandler
 
 logger = logging.getLogger(__name__)
 
+# 가이드라인 이미지 앞에 붙는 라벨. 실물 사진의 "[사진 N]" 번호와
+# 섞이지 않도록 번호를 쓰지 않습니다.
+GUIDE_LABEL = "[가이드라인] 2D 펼침 틀 — 신발 사진이 아니야"
+
 
 def build_step_parts(
     step_num: int,
@@ -100,7 +104,12 @@ def _insert_guide_images(parts: list, guide_image_path: Path | str | None) -> li
         return parts
 
     logger.info("가이드라인 이미지 %d장 포함: %s", len(guides), guide_image_path)
-    return _insert_before_prompt(parts, guides)
+    # 라벨 없이 넣으면 앞의 실물 사진 뒤에 붙어서 '[사진 N]' 중 하나로 읽힙니다.
+    labelled: list = []
+    for guide in guides:
+        labelled.append(GUIDE_LABEL)
+        labelled.append(guide)
+    return _insert_before_prompt(parts, labelled)
 
 
 def _load_guide_images(guide_path: Path) -> list:

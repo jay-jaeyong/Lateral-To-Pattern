@@ -1,5 +1,6 @@
 """라벨이 붙은 이미지 파트 조립 테스트."""
 
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -117,3 +118,33 @@ class BuildStepPartsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GuideLabelTest(unittest.TestCase):
+    """가이드라인에 라벨이 없으면 실물 사진의 '[사진 N]' 중 하나로 읽힙니다."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_guide_image_is_labelled_and_unnumbered(self):
+        from core._parts_builder import GUIDE_LABEL
+
+        guide_dir = self.tmp / "guides"
+        guide_dir.mkdir()
+        make_png(guide_dir / "가이드라인.png")
+
+        parts = build_step_parts(
+            step_num=2,
+            prompt="PROMPT",
+            image_path=None,
+            prev_images=[],
+            prev_texts=[],
+            guide_image_path=guide_dir,
+        )
+        self.assertIn(GUIDE_LABEL, parts)
+        # "[사진 N]" 번호 형식이면 안 됩니다. 설명 문구에 '사진'이 들어가는 건 무방합니다.
+        self.assertIsNone(re.search(r"\[사진 \d", GUIDE_LABEL))
+        # 라벨 바로 뒤에 가이드라인 이미지가 와야 합니다.
+        self.assertIsInstance(parts[parts.index(GUIDE_LABEL) + 1], Image.Image)
