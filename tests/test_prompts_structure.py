@@ -168,7 +168,8 @@ class PromptContentTest(unittest.TestCase):
         """좌우 판정과 개수가 없으면 복원 단계가 몇 개를 그릴지 정하지 못합니다."""
         survey = PIPELINE_STEPS[0]["prompt"]
         self.assertIn('"symmetry_rule"', survey)
-        self.assertIn("'양쪽', '한쪽만(바깥쪽)', '한쪽만(안쪽)', '확인 불가'", survey)
+        self.assertIn("'중앙(좌우 구분 없음)'", survey)
+        self.assertIn("다섯 중 하나로 적어", survey)
         self.assertIn("개수를 반드시 숫자로 적어", survey)
 
     def test_unfold_forbids_partial_counts(self):
@@ -357,3 +358,26 @@ class MaterialEvidenceTest(unittest.TestCase):
         survey = PIPELINE_STEPS[0]["prompt"]
         self.assertIn("주변 부품까지 같은 재질로 번지게 하지 마", survey)
         self.assertIn("주변 부품에서 빌려오지도 마", survey)
+
+
+class LabelFormatTest(unittest.TestCase):
+    """라벨에 번호가 있으면 명세서가 번호로 근거를 인용하고, 스텝을 넘으면 어긋납니다."""
+
+    def test_label_carries_no_photo_number(self):
+        from handlers.image_handler import ImageHandler
+
+        self.assertEqual(ImageHandler.LABEL_FORMAT, "[{label}]")
+        rendered = ImageHandler.LABEL_FORMAT.format(index=1, label="바깥쪽 측면(lateral)")
+        self.assertEqual(rendered, "[바깥쪽 측면(lateral)]")
+        self.assertNotIn("사진", rendered)
+
+    def test_survey_input_names_all_five_labels(self):
+        labels = dict(VIEW_FLAGS)
+        survey_input = PIPELINE_STEPS[0]["prompt"]
+        for name in ("lateral", "medial", "front", "heel", "top"):
+            self.assertIn(labels[name], survey_input, msg=name)
+        self.assertIn("다섯 가지야", survey_input)
+
+    def test_survey_says_the_label_does_not_reveal_the_angle_kind(self):
+        self.assertIn("정면인지 비스듬한 쿼터 뷰인지는 알려주지 않으니",
+                      PIPELINE_STEPS[0]["prompt"])

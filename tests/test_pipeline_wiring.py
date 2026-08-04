@@ -214,7 +214,7 @@ class ReferenceViewTest(unittest.TestCase):
             sent = self.run_pipeline([(labels["lateral"], lat), (labels["medial"], med)])
 
         step2 = sent[1]
-        self.assertEqual(step2[0], f"[사진 1] {labels['lateral']}")
+        self.assertEqual(step2[0], f"[{labels['lateral']}]")
         self.assertIsInstance(step2[1], Image.Image)
         # 요청한 뷰만 다시 들어옵니다: lateral 한 장 + 가이드라인 한 장.
         self.assertEqual(sum(1 for p in step2 if isinstance(p, Image.Image)), 2)

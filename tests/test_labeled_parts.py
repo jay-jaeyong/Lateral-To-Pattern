@@ -29,9 +29,9 @@ class BuildLabeledPartsTest(unittest.TestCase):
             [("바깥쪽 측면(lateral)", a), ("안쪽 측면(medial)", b)], "PROMPT"
         )
         self.assertEqual(len(parts), 5)
-        self.assertEqual(parts[0], "[사진 1] 바깥쪽 측면(lateral)")
+        self.assertEqual(parts[0], "[바깥쪽 측면(lateral)]")
         self.assertIsInstance(parts[1], Image.Image)
-        self.assertEqual(parts[2], "[사진 2] 안쪽 측면(medial)")
+        self.assertEqual(parts[2], "[안쪽 측면(medial)]")
         self.assertIsInstance(parts[3], Image.Image)
         self.assertEqual(parts[4], "PROMPT")
 
@@ -44,7 +44,7 @@ class BuildLabeledPartsTest(unittest.TestCase):
             ],
             "PROMPT",
         )
-        self.assertEqual(parts[0], "[사진 1] 안쪽 측면(medial)")
+        self.assertEqual(parts[0], "[안쪽 측면(medial)]")
         self.assertEqual(len(parts), 3)
 
     def test_no_loadable_image_returns_prompt_only(self):
@@ -66,8 +66,8 @@ class LoadDirImagesTest(unittest.TestCase):
         make_png(folder / "01_lateral.png")
         make_png(folder / "02_medial.png")
         parts = ImageHandler._load_dir_images(folder, "PROMPT")
-        self.assertEqual(parts[0], "[사진 1] 파일명: 01_lateral")
-        self.assertEqual(parts[2], "[사진 2] 파일명: 02_medial")
+        self.assertEqual(parts[0], "[파일명: 01_lateral]")
+        self.assertEqual(parts[2], "[파일명: 02_medial]")
         self.assertEqual(parts[-1], "PROMPT")
 
     def test_max_images_truncates(self):
@@ -77,7 +77,7 @@ class LoadDirImagesTest(unittest.TestCase):
         make_png(folder / "02_medial.png")
         parts = ImageHandler._load_dir_images(folder, "PROMPT", max_images=1)
         self.assertEqual(len(parts), 3)
-        self.assertEqual(parts[0], "[사진 1] 파일명: 01_lateral")
+        self.assertEqual(parts[0], "[파일명: 01_lateral]")
 
 
 class BuildStepPartsTest(unittest.TestCase):
@@ -100,7 +100,7 @@ class BuildStepPartsTest(unittest.TestCase):
             prev_texts=[],
             view_images=[("바깥쪽 측면(lateral)", view)],
         )
-        self.assertEqual(parts[0], "[사진 1] 바깥쪽 측면(lateral)")
+        self.assertEqual(parts[0], "[바깥쪽 측면(lateral)]")
         self.assertEqual(len(parts), 3)
 
     def test_falls_back_to_image_path_when_no_view_images(self):

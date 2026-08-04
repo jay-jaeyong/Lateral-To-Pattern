@@ -70,14 +70,14 @@ class LoadDirImagesLabelTest(unittest.TestCase):
 
     def test_folder_mode_emits_canonical_labels(self):
         parts = ImageHandler._load_dir_images(self.folder, "PROMPT")
-        self.assertEqual(parts[0], f"[사진 1] {LABELS['lateral']}")
-        self.assertEqual(parts[2], f"[사진 2] {LABELS['front']}")
-        self.assertEqual(parts[4], f"[사진 3] {LABELS['top']}")
+        self.assertEqual(parts[0], f"[{LABELS['lateral']}]")
+        self.assertEqual(parts[2], f"[{LABELS['front']}]")
+        self.assertEqual(parts[4], f"[{LABELS['top']}]")
 
     def test_max_images_keeps_the_reference_photo(self):
         # 정렬 전에 잘라내면 알파벳순 첫 장인 front가 남아 기준 사진이 사라집니다.
         parts = ImageHandler._load_dir_images(self.folder, "PROMPT", max_images=1)
-        self.assertEqual(parts[0], f"[사진 1] {LABELS['lateral']}")
+        self.assertEqual(parts[0], f"[{LABELS['lateral']}]")
         self.assertEqual(len(parts), 3)
 
 
@@ -171,9 +171,9 @@ class RunForEachTest(unittest.TestCase):
         self.assertEqual(
             labels,
             [
-                f"[사진 1] {LABELS['lateral']}",
-                f"[사진 2] {LABELS['front']}",
-                f"[사진 3] {LABELS['top']}",
+                f"[{LABELS['lateral']}]",
+                f"[{LABELS['front']}]",
+                f"[{LABELS['top']}]",
             ],
         )
 
