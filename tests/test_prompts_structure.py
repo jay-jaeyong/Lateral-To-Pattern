@@ -343,3 +343,17 @@ class SurveyPriorityTest(unittest.TestCase):
 
     def test_top_view_defers_eyestay_material_to_its_own_rule(self):
         self.assertIn("아이스테이)의 재질은 eyestay_rule을 따라", PIPELINE_STEPS[0]["prompt"])
+
+
+class MaterialEvidenceTest(unittest.TestCase):
+    """'주변과 동일'을 근거로 쓰면 한 부품의 오판이 이웃으로 번집니다."""
+
+    def test_material_evidence_must_come_from_the_part_itself(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("판정 근거는 그 부품 자체에서만 가져와", survey)
+        self.assertIn("판정 근거가 아니야", survey)
+
+    def test_priority_blocks_borrowing_in_both_directions(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("주변 부품까지 같은 재질로 번지게 하지 마", survey)
+        self.assertIn("주변 부품에서 빌려오지도 마", survey)
