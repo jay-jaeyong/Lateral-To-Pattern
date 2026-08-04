@@ -283,3 +283,24 @@ class MidsoleBoundaryTest(unittest.TestCase):
     def test_survey_defines_where_the_midsole_line_is(self):
         survey = PIPELINE_STEPS[0]["prompt"]
         self.assertIn("거품·고무 솔이 끝나고 원단·오버레이가 시작되는 경계", survey)
+
+
+class FrontViewRuleTest(unittest.TestCase):
+    def test_survey_reads_the_toe_only_from_the_front_photo(self):
+        """옆에서 찍은 사진에는 앞코 앞면이 없어서 토 캡을 지어내곤 합니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn('"front_view_rule"', survey)
+        self.assertIn("토 캡이 있을 거라고 넘겨짚지 마", survey)
+
+    def test_front_rule_handles_both_straight_and_diagonal_views(self):
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("위쪽에서 대각선으로 내려다본 것인지", survey)
+        self.assertIn("앞코 중심선", survey)
+
+
+class UpperOnlySurveyTest(unittest.TestCase):
+    def test_sole_parts_are_left_out_of_the_list_entirely(self):
+        """'제외함'으로 적어두면 다음 단계가 그걸 부품으로 읽습니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("명세서에는 Upper 부품만 적어", survey)
+        self.assertIn("'제외함'이라고 적지도 마", survey)
