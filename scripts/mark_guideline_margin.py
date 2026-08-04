@@ -20,12 +20,16 @@ P3 실험에서 그것이 SONOMA의 아식스 교차 스트라이프 소실과 �
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-SRC = Path("images/가이드라인.jpg")
-DST = Path("guides/가이드라인_여백표시.png")
+# 입력·출력을 인자로 받습니다. 비대칭 판본에도 같은 라벨을 얹기 위한 것입니다.
+#   uv run python scripts/mark_guideline_margin.py \
+#       guides/가이드라인_비대칭.png guides/가이드라인_비대칭_여백표시.png
+SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("images/가이드라인.jpg")
+DST = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("guides/가이드라인_여백표시.png")
 
 FONT_CANDIDATES = (
     "/System/Library/Fonts/AppleSDGothicNeo.ttc",
