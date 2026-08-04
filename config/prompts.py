@@ -429,5 +429,8 @@ PIPELINE_STEPS: list[dict] = [
         # 앞 단계에서 생성된 패턴 이미지가 자동으로 입력에 포함됩니다.
         "image_path": None,
         "save_output": True,
+        # 지금은 Step 2(펼치기)의 정확도만 보고 있어서 꺼둡니다.
+        # 이 스텝은 404 NOT_FOUND로도 자주 실패했습니다. 다시 켜려면 True로.
+        "enabled": False,
     },
 ]

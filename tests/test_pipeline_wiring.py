@@ -224,4 +224,19 @@ class ReferenceViewTest(unittest.TestCase):
             top = Path(tmp) / "top.png"
             Image.new("RGB", (6, 6)).save(top)
             sent = self.run_pipeline([(dict(VIEW_FLAGS)["top"], top)])
-        self.assertEqual(len(sent), 3)
+        # enabled=False인 스텝은 빠지므로 실행된 스텝 수만큼만 호출됩니다.
+        enabled = [s for s in PIPELINE_STEPS if s.get("enabled", True)]
+        self.assertEqual(len(sent), len(enabled))
+
+
+class DisabledStepTest(unittest.TestCase):
+    def test_steps_marked_disabled_are_not_run(self):
+        """Step 3는 지금 꺼져 있습니다. 켜고 끄는 스위치가 동작해야 합니다."""
+        steps = [
+            {"step": 1, "name": "a", "description": "d", "prompt": "p", "image_path": None},
+            {"step": 2, "name": "b", "description": "d", "prompt": "p", "image_path": None,
+             "enabled": False},
+        ]
+        pipeline = Pipeline.__new__(Pipeline)
+        pipeline._steps = [s for s in steps if s.get("enabled", True)]
+        self.assertEqual([s["name"] for s in pipeline._steps], ["a"])

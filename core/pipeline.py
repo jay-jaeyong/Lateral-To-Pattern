@@ -54,7 +54,8 @@ class Pipeline:
             batch_targets: 신발 이미지(또는 모델 폴더) 목록. 주어지면 각 항목마다
                            파이프라인을 개별 실행합니다.
         """
-        self._steps = steps or PIPELINE_STEPS
+        # enabled=False로 꺼둔 스텝은 아예 실행 목록에서 뺍니다.
+        self._steps = [s for s in (steps or PIPELINE_STEPS) if s.get("enabled", True)]
         self._batch_targets = batch_targets
         self._client = GeminiClient()
         self._output_handler = OutputHandler(
