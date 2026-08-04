@@ -57,9 +57,19 @@ SAFETY_SETTINGS = [
 CHAT_CONFIG = types.GenerateContentConfig(
     response_modalities=RESPONSE_MODALITIES,
     image_config=IMAGE_CONFIG,
-    media_resolution=types.MediaResolution.MEDIA_RESOLUTION_HIGH,
     safety_settings=SAFETY_SETTINGS,
 )
+
+# ─────────────────────────────────────────────
+# 입력 이미지 해상도
+# ─────────────────────────────────────────────
+# 모델이 사진을 더 촘촘히 보도록 고해상도로 넣습니다. 요철·톤온톤 스티치처럼
+# 작고 대비가 낮은 특징을 읽는 데 필요합니다.
+#
+# GenerateContentConfig에 media_resolution을 넣으면 gemini-3-pro-image가
+# 400 'MediaResolution is not supported'로 거절합니다. 파트 단위로 지정하면
+# 통과하므로, services/gemini_client.py가 이미지 파트마다 이 값을 붙입니다.
+INPUT_MEDIA_RESOLUTION = types.MediaResolution.MEDIA_RESOLUTION_HIGH
 
 # ─────────────────────────────────────────────
 # 스텝별 응답 모달리티 오버라이드
@@ -77,7 +87,6 @@ def build_response_config(
 
     kwargs = {
         "response_modalities": list(modalities),
-        "media_resolution": types.MediaResolution.MEDIA_RESOLUTION_HIGH,
         "safety_settings": SAFETY_SETTINGS,
     }
     if "IMAGE" in modalities:

@@ -4,7 +4,12 @@ import unittest
 
 from google.genai import types
 
-from config.gemini_config import CHAT_CONFIG, IMAGE_CONFIG, build_response_config
+from config.gemini_config import (
+    CHAT_CONFIG,
+    IMAGE_CONFIG,
+    INPUT_MEDIA_RESOLUTION,
+    build_response_config,
+)
 from core.models import StepResponse
 from services.gemini_client import GeminiClient
 
@@ -13,20 +18,28 @@ class BuildResponseConfigTest(unittest.TestCase):
     def test_image_output_is_portrait_two_to_three(self):
         self.assertEqual(IMAGE_CONFIG.aspect_ratio, "2:3")
 
-    def test_default_chat_uses_high_media_resolution_and_default_temperature(self):
+    def test_input_images_ask_for_high_media_resolution(self):
+        """요철·톤온톤 스티치를 읽으려면 사진을 고해상도로 넣어야 합니다."""
         self.assertEqual(
-            CHAT_CONFIG.media_resolution,
+            INPUT_MEDIA_RESOLUTION,
             types.MediaResolution.MEDIA_RESOLUTION_HIGH,
         )
-        self.assertIsNone(CHAT_CONFIG.temperature)
 
-    def test_text_override_keeps_high_media_resolution_and_default_temperature(self):
-        config = build_response_config(["TEXT"])
-        self.assertEqual(
-            config.media_resolution,
-            types.MediaResolution.MEDIA_RESOLUTION_HIGH,
-        )
-        self.assertIsNone(config.temperature)
+    def test_configs_never_carry_media_resolution(self):
+        """config에 실으면 gemini-3-pro-image가 400으로 거절합니다.
+
+        같은 값을 파트 단위로 붙이면 통과하므로, 해상도 지정은
+        services/gemini_client.py의 이미지 파트에만 실립니다.
+        """
+        self.assertIsNone(CHAT_CONFIG.media_resolution)
+        for modalities in (["TEXT"], ["IMAGE"]):
+            self.assertIsNone(
+                build_response_config(modalities).media_resolution, msg=str(modalities)
+            )
+
+    def test_temperature_stays_at_the_api_default(self):
+        self.assertIsNone(CHAT_CONFIG.temperature)
+        self.assertIsNone(build_response_config(["TEXT"]).temperature)
 
     def test_none_means_use_session_default(self):
         self.assertIsNone(build_response_config(None))

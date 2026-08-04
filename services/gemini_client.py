@@ -10,6 +10,7 @@ Gemini API와의 통신을 담당하는 클라이언트.
 
 from __future__ import annotations
 
+import io
 import time
 import logging
 from pathlib import Path
@@ -20,6 +21,7 @@ from google.genai import types as genai_types
 
 from config.api_config import get_api_key
 from config.gemini_config import (
+    INPUT_MEDIA_RESOLUTION,
     MODEL_NAME,
     CHAT_CONFIG,
     MAX_RETRIES,
@@ -28,6 +30,21 @@ from config.gemini_config import (
 from core.models import StepResponse
 
 logger = logging.getLogger(__name__)
+
+
+def _image_part(image: PILImage.Image) -> genai_types.Part:
+    """PIL 이미지를 고해상도 지정이 붙은 Part로 바꿉니다.
+
+    PNG로 무손실 인코딩합니다. SDK에 PIL 이미지를 그대로 넘기면 어차피
+    재인코딩되므로 여기서 감싸는 편이 화질 손해가 없습니다.
+    """
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return genai_types.Part.from_bytes(
+        data=buffer.getvalue(),
+        mime_type="image/png",
+        media_resolution=INPUT_MEDIA_RESOLUTION,
+    )
 
 
 class GeminiClient:
@@ -101,8 +118,13 @@ class GeminiClient:
         sanitized: list = []
         for idx, p in enumerate(parts):
             # 허용되는 기본 타입: str, PIL.Image, genai File/Part, dict-like PartDict
-            if isinstance(p, str) or isinstance(p, PILImage.Image):
+            if isinstance(p, str):
                 sanitized.append(p)
+                continue
+            # PIL 이미지는 Part로 감싸 고해상도로 넣습니다. config 레벨의
+            # media_resolution은 이 모델이 거부하므로 파트 단위로 붙입니다.
+            if isinstance(p, PILImage.Image):
+                sanitized.append(_image_part(p))
                 continue
             # genai types: File, Part (실제 클래스만 isinstance 체크, TypedDict 제외)
             allowed_classes = tuple(
@@ -123,7 +145,9 @@ class GeminiClient:
                 try:
                     sanitized.append(
                         genai_types.Part.from_bytes(
-                            data=p.image_bytes, mime_type=p.mime_type or "image/png"
+                            data=p.image_bytes,
+                            mime_type=p.mime_type or "image/png",
+                            media_resolution=INPUT_MEDIA_RESOLUTION,
                         )
                     )
                     continue
