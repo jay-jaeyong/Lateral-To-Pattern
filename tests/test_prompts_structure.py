@@ -252,3 +252,18 @@ class PromptContentTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HeelViewRuleTest(unittest.TestCase):
+    def test_survey_reads_the_heel_only_from_the_heel_photo(self):
+        """측면 사진에는 뒤축 뒷면이 없어서, 없는 힐 컵을 지어내곤 했습니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn('"heel_view_rule"', survey)
+        self.assertIn("힐 카운터나 힐 컵이 있을 거라고 넘겨짚지 마", survey)
+        self.assertIn("측면 소재가 이어짐", survey)
+
+    def test_survey_guards_against_quarter_view_foreshortening(self):
+        """쿼터 뷰에서 중족부 부품이 뒤꿈치 것으로 잘못 기록됐습니다."""
+        survey = PIPELINE_STEPS[0]["prompt"]
+        self.assertIn("원근에 눌려서", survey)
+        self.assertIn("뒤축 중심선", survey)
