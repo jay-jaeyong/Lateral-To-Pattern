@@ -32,6 +32,7 @@ def build_step_parts(
     guide_image_path: Path | str | None = None,
     max_images: int | None = None,
     view_images: list[tuple[str, Path]] | None = None,
+    reference_images: list[tuple[str, object]] | None = None,
 ) -> list:
     """각 단계별 parts 리스트를 조립하여 반환합니다.
 
@@ -45,6 +46,7 @@ def build_step_parts(
         guide_image_path: 가이드라인(틀) 이미지 경로 (None 가능)
         max_images      : 폴더에서 불러올 이미지 최대 장수 (None이면 전부)
         view_images     : (라벨, 경로) 목록. 주어지면 image_path 대신 이것을 쓴다
+        reference_images: (라벨, 이미 로드된 이미지) 목록. parts 맨 앞에 붙는다
     """
     # ── 1. 현재 단계의 주 입력 이미지 + 프롬프트 로드 ──────────────────
     if prebuilt_parts is not None:
@@ -60,6 +62,9 @@ def build_step_parts(
 
     # ── 3. 이전 생성 이미지를 parts 앞에 추가 ──────────────────────────
     parts = _prepend_prev_images(parts, prev_images)
+
+    # ── 3-1. 앞 단계에서 쓴 실물 사진을 다시 맨 앞에 붙인다 ────────────
+    parts = _prepend_reference_images(parts, reference_images)
 
     # ── 4. 이전 단계 텍스트를 프롬프트 바로 앞에 삽입 ──────────────────
     parts = _insert_prev_texts(parts, prev_texts)
@@ -120,6 +125,23 @@ def _load_guide_images(guide_path: Path) -> list:
         return []
 
     return []
+
+
+def _prepend_reference_images(parts: list, references: list | None) -> list:
+    """앞 단계에서 쓴 실물 사진을 라벨과 함께 parts 맨 앞에 붙입니다.
+
+    채팅 히스토리에만 의존하면 모델이 원본을 흐릿하게 참조합니다. 같은 요청 안에
+    다시 넣어주면 세부를 직접 대조할 수 있습니다.
+    """
+    if not references:
+        return parts
+
+    prefixed: list = []
+    for label, image in references:
+        prefixed.append(label)
+        prefixed.append(image)
+    logger.info("실물 참조 사진 %d장을 현재 요청에 다시 포함했습니다.", len(references))
+    return [*prefixed, *parts]
 
 
 def _prepend_prev_images(parts: list, prev_imgs: list) -> list:

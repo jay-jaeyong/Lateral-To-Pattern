@@ -25,7 +25,7 @@ from services.gemini_client import GeminiClient
 from handlers.image_handler import ImageHandler
 from handlers.output_handler import OutputHandler
 from utils.logging_utils import step_context
-from utils.cli import label_image_files, resolve_run_label_from_path
+from utils.cli import VIEW_FLAGS, label_image_files, resolve_run_label_from_path
 from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,9 @@ class Pipeline:
         )
         # 초기 입력 이미지(단계별)를 보관합니다. key: step number -> list[PIL.Image]
         self._initial_images: dict[int, list] = {}
+        # 첫 스텝에 넣은 실물 사진을 (라벨, 이미지)로 보관합니다. 뒤 스텝이
+        # 채팅 히스토리 대신 직접 다시 참조할 때 씁니다.
+        self._reference_images: list[tuple[str, object]] = []
         # 사용자가 명시적으로 run_label을 제공했는지 여부
         self._run_label_forced = run_label is not None
 
@@ -149,6 +152,39 @@ class Pipeline:
             # 원래 경로도 확인 (없으면 그대로)
 
         return resolved
+
+    @staticmethod
+    def _pair_labels_with_images(parts: list) -> list[tuple[str, object]]:
+        """[라벨, 이미지, 라벨, 이미지, ...] 형태의 parts에서 쌍을 뽑습니다."""
+        pairs: list[tuple[str, object]] = []
+        for index, part in enumerate(parts[:-1]):
+            if isinstance(part, str) and isinstance(parts[index + 1], PILImage.Image):
+                pairs.append((part, parts[index + 1]))
+        return pairs
+
+    def _references_for(self, wanted: list[str]) -> list[tuple[str, object]]:
+        """스텝이 요청한 뷰의 (라벨, 이미지)를 첫 스텝 입력에서 골라옵니다.
+
+        wanted는 뷰 플래그 이름 목록입니다(예: ["lateral"]). 해당 뷰가 없으면
+        경고만 남기고 건너뜁니다. 사진이 없는 실행에서도 죽지 않아야 합니다.
+        """
+        if not wanted or not self._reference_images:
+            return []
+
+        labels = dict(VIEW_FLAGS)
+        picked: list[tuple[str, object]] = []
+        for name in wanted:
+            canonical = labels.get(name)
+            if canonical is None:
+                continue
+            match = next(
+                (pair for pair in self._reference_images if canonical in pair[0]), None
+            )
+            if match is None:
+                logger.warning("참조로 요청한 '%s' 사진이 첫 스텝 입력에 없습니다.", canonical)
+                continue
+            picked.append(match)
+        return picked
 
     def _run_for_each(self, targets: list[Path], pipeline_result: PipelineResult) -> PipelineResult:
         """선택된 모델 폴더마다 파이프라인을 개별 실행합니다('all' 선택 또는 --shoe-image 배치)."""
@@ -299,6 +335,7 @@ class Pipeline:
         image_path = config.get("image_path")
         guide_image_path = config.get("guide_image_path")
         view_images = config.get("view_images")
+        reference_views = config.get("reference_views")
         should_save = config.get("save_output", True)
 
         with step_context(step_num):
@@ -316,6 +353,7 @@ class Pipeline:
                     guide_image_path=guide_image_path,
                     max_images=config.get("max_images"),
                     view_images=view_images,
+                    reference_images=self._references_for(reference_views or []),
                 )
             except Exception:
                 logger.exception("parts 조립 실패 — 프롬프트만으로 진행합니다.")
@@ -326,6 +364,8 @@ class Pipeline:
                 imgs_in_parts = [p for p in parts if isinstance(p, PILImage.Image)]
                 if imgs_in_parts:
                     self._initial_images[step_num] = imgs_in_parts
+                if not self._reference_images:
+                    self._reference_images = self._pair_labels_with_images(parts)
             except Exception:
                 logger.debug("입력 이미지 캡처 실패 (무시)")
 
