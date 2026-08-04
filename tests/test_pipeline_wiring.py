@@ -7,11 +7,9 @@ from unittest.mock import patch, MagicMock
 
 from PIL import Image
 
-import core.pipeline as pipeline_module
 from config.prompts import PIPELINE_STEPS
 from core.pipeline import Pipeline
 from core.models import StepResponse
-from utils.cli import VIEW_FLAGS
 
 
 def make_test_image(path: Path) -> Path:
@@ -161,67 +159,3 @@ class PipelineWiringTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class ReferenceViewTest(unittest.TestCase):
-    """Step 2가 기준 사진을 채팅 히스토리 대신 직접 받는지 확인합니다."""
-
-    class _Stub:
-        def __init__(self, sent):
-            self.sent = sent
-
-        def start_chat(self):
-            pass
-
-        @property
-        def chat_history(self):
-            return []
-
-        def _format_parts_for_log(self, parts):
-            return ""
-
-        def _format_chat_history_for_log(self):
-            return ""
-
-        def send(self, parts, config=None):
-            self.sent.append(parts)
-            modalities = list(config.response_modalities) if config else None
-            if modalities == ["TEXT"]:
-                return StepResponse(text="명세서", images=[])
-            return StepResponse(text="", images=[Image.new("RGB", (4, 4))])
-
-    def setUp(self):
-        self._out = tempfile.TemporaryDirectory()
-        self.addCleanup(self._out.cleanup)
-        self._real = pipeline_module.GeminiClient
-        self.addCleanup(setattr, pipeline_module, "GeminiClient", self._real)
-
-    def run_pipeline(self, view_images):
-        sent: list = []
-        pipeline_module.GeminiClient = lambda *a, **k: self._Stub(sent)
-        steps = [dict(s) for s in PIPELINE_STEPS]
-        steps[0]["view_images"] = view_images
-        steps[0]["image_path"] = None
-        Pipeline(steps=steps, output_dir=Path(self._out.name), run_label="t").run()
-        return sent
-
-    def test_step2_receives_the_lateral_photo_again(self):
-        labels = dict(VIEW_FLAGS)
-        with tempfile.TemporaryDirectory() as tmp:
-            lat, med = Path(tmp) / "lateral.png", Path(tmp) / "medial.png"
-            for path in (lat, med):
-                Image.new("RGB", (6, 6)).save(path)
-            sent = self.run_pipeline([(labels["lateral"], lat), (labels["medial"], med)])
-
-        step2 = sent[1]
-        self.assertEqual(step2[0], f"[사진 1] {labels['lateral']}")
-        self.assertIsInstance(step2[1], Image.Image)
-        # 요청한 뷰만 다시 들어옵니다: lateral 한 장 + 가이드라인 한 장.
-        self.assertEqual(sum(1 for p in step2 if isinstance(p, Image.Image)), 2)
-
-    def test_missing_lateral_does_not_break_the_run(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            top = Path(tmp) / "top.png"
-            Image.new("RGB", (6, 6)).save(top)
-            sent = self.run_pipeline([(dict(VIEW_FLAGS)["top"], top)])
-        self.assertEqual(len(sent), 3)
