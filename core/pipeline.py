@@ -3,13 +3,16 @@ Pipeline
 ---------
 멀티스텝 채팅 파이프라인.
 
-관찰 → 펼치기 → 라인 아트 3스텝을 같은 채팅 세션에서 순차 실행합니다.
+관찰 → 펼치기 → 라인 아트 3스텝을 순차 실행합니다.
   Step 1: [라벨, 신발 사진, ..., 프롬프트] → 텍스트 명세서
   Step 2: [가이드라인, Step 1 명세서, 프롬프트] → 2D 패턴 이미지
-  Step 3: [Step 2 이미지, Step 1 명세서, 프롬프트] → 라인 아트 이미지
+  Step 3: [Step 2 이미지, 프롬프트] (명세서 미포함) → 라인 아트 이미지
 
-이전 단계의 응답을 채팅 히스토리로 유지한 채 순차 실행되므로,
-Gemini는 전체 대화 맥락을 가지고 각 단계에 응답합니다.
+Step 1·2는 같은 채팅 세션을 공유해 이전 단계 응답을 히스토리로 유지합니다.
+Step 3는 fresh_session=True로 표시되어 있어 자신의 차례 직전에 채팅 세션이
+새로 열립니다. Step 1 명세서가 히스토리를 통해 Step 3에 전달되는 것을 막기
+위함입니다(config/prompts.py 참고). 끊긴 히스토리는 Pipeline._history_archive에
+보관되어 최종 chat_history.json에서는 그대로 이어져 보입니다.
 """
 
 from __future__ import annotations
@@ -35,7 +38,9 @@ class Pipeline:
     """순차적 멀티스텝 Gemini 채팅 파이프라인.
 
     config/prompts.py에 정의된 PIPELINE_STEPS를 순서대로 실행합니다.
-    각 단계는 동일한 채팅 세션 안에서 실행되어 컨텍스트가 유지됩니다.
+    Step 1·2는 같은 채팅 세션을 공유해 컨텍스트가 유지되지만, fresh_session=True로
+    표시된 스텝(Step 3)은 실행 직전에 채팅 세션이 새로 시작되어 그 전 단계들의
+    컨텍스트를 이어받지 않습니다.
     """
 
     def __init__(
@@ -69,6 +74,10 @@ class Pipeline:
         self._reference_images: list[tuple[str, object]] = []
         # 사용자가 명시적으로 run_label을 제공했는지 여부
         self._run_label_forced = run_label is not None
+        # fresh_session으로 채팅 세션을 다시 열기 전에, 그때까지 쌓인 히스토리를
+        # 여기 이어 붙여둡니다. save_final에 넘길 때 현재 세션 히스토리와 합쳐
+        # chat_history.json에서 턴이 유실되지 않게 합니다.
+        self._history_archive: list = []
 
     # ──────────────────────────────────────────────────
     # 실행
@@ -290,6 +299,13 @@ class Pipeline:
 
             step_config = self._resolve_step_images(step_config, model_name, is_first=(index == 0))
 
+            if step_config.get("fresh_session"):
+                # 히스토리 경로로 이전 단계 텍스트가 전달되지 않도록 세션을 끊습니다.
+                # 끊기 전 히스토리는 archive에 보관해 chat_history.json에서 유실되지 않게 합니다.
+                self._history_archive.extend(self._client.chat_history)
+                self._client.start_chat()
+                logger.info("Step %d: fresh_session=True — 채팅 세션을 새로 시작합니다", step_config["step"])
+
             step_result = self._run_step(
                 step_config,
                 previous_texts,
@@ -308,7 +324,7 @@ class Pipeline:
         self._output_handler.save_final(
             text=pipeline_result.final_output,
             generated_images=last.generated_images if last else [],
-            chat_history=self._client.chat_history,
+            chat_history=self._history_archive + self._client.chat_history,
         )
 
         logger.info("파이프라인 완료")
@@ -346,6 +362,7 @@ class Pipeline:
                     max_images=config.get("max_images"),
                     view_images=view_images,
                     reference_images=self._references_for(reference_views or []),
+                    include_prev_texts=config.get("include_prev_texts", True),
                 )
             except Exception:
                 logger.exception("parts 조립 실패 — 프롬프트만으로 진행합니다.")

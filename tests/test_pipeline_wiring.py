@@ -158,6 +158,208 @@ class PipelineWiringTest(unittest.TestCase):
             combined_text = " ".join(text_parts)
             self.assertIn(step1_text, combined_text)
 
+    def test_step3_include_prev_texts_false_omits_step1_spec(self):
+        """include_prev_texts=False인 스텝(Step 3)의 parts에는 Step 1 명세서가
+        없어야 하고, include_prev_texts를 지정하지 않은 스텝(Step 2)의 parts에는
+        여전히 있어야 합니다. config.get("include_prev_texts", True) 전달이
+        끊기면(예: 그 인자를 지우면) 이 테스트가 실패해야 합니다."""
+        step1_text = "부품 목록: ..."
+
+        steps = [
+            {
+                "step": 1,
+                "name": "step1",
+                "description": "test",
+                "prompt": "test prompt",
+                "image_path": self.shoe_img,
+                "response_modalities": ["TEXT"],
+                "save_output": False,
+            },
+            {
+                "step": 2,
+                "name": "step2",
+                "description": "test",
+                "prompt": "test prompt",
+                "image_path": None,
+                "guide_image_path": self.guide_img,
+                "save_output": False,
+            },
+            {
+                "step": 3,
+                "name": "step3",
+                "description": "test",
+                "prompt": "test prompt",
+                "image_path": None,
+                "save_output": False,
+                "include_prev_texts": False,
+            },
+        ]
+
+        with patch("core.pipeline.GeminiClient") as MockClient:
+            mock_instance = MagicMock()
+            MockClient.return_value = mock_instance
+
+            mock_instance.send.side_effect = [
+                StepResponse(text=step1_text, images=[]),
+                StepResponse(text="Step 2 output", images=[MagicMock()]),
+                StepResponse(text="Step 3 output", images=[MagicMock()]),
+            ]
+
+            pipeline = Pipeline(steps=steps, output_dir=Path(self.tmp))
+            pipeline.run(skip_initial_selection=True)
+
+            self.assertEqual(mock_instance.send.call_count, 3)
+
+            step2_parts = mock_instance.send.call_args_list[1][0][0]
+            step2_text_parts = [p for p in step2_parts if isinstance(p, str)]
+            self.assertIn(step1_text, " ".join(step2_text_parts))
+
+            step3_parts = mock_instance.send.call_args_list[2][0][0]
+            step3_text_parts = [p for p in step3_parts if isinstance(p, str)]
+            self.assertNotIn(step1_text, " ".join(step3_text_parts))
+
+    class _SessionTrackingStub:
+        """start_chat() 호출 횟수와 그때마다 바뀌는 chat_history를 추적하는
+        가짜 클라이언트. 매 start_chat() 호출마다 새 세션이 시작된 것처럼
+        chat_history를 그 세션의 턴만 담긴 새 리스트로 바꿉니다."""
+
+        def __init__(self, responses):
+            self._responses = list(responses)
+            self.start_chat_call_count = 0
+            self._history = []
+            self.sent_parts = []
+
+        def start_chat(self):
+            self.start_chat_call_count += 1
+            self._history = []
+
+        @property
+        def chat_history(self):
+            return self._history
+
+        def _format_parts_for_log(self, parts):
+            return ""
+
+        def _format_chat_history_for_log(self):
+            return ""
+
+        def send(self, parts, config=None):
+            self.sent_parts.append(parts)
+            response = self._responses.pop(0)
+            # 실제 GeminiClient처럼 이번 턴을 현재 세션의 히스토리에 남깁니다.
+            self._history.append(f"turn:{response.text}")
+            return response
+
+    def test_fresh_session_step_starts_new_chat_and_omits_history(self):
+        """fresh_session=True인 스텝(Step 3) 실행 직전에 start_chat()이 다시
+        호출되어야 하고, 그 스텝의 parts에는 Step 1 명세서 텍스트가 없어야
+        합니다. Pipeline.run에서 fresh_session 분기를 지우면 이 테스트가
+        실패해야 합니다(start_chat 호출 횟수가 1로 줄어듭니다)."""
+        step1_text = "부품 목록: ..."
+
+        steps = [
+            {
+                "step": 1,
+                "name": "step1",
+                "description": "test",
+                "prompt": "test prompt",
+                "image_path": self.shoe_img,
+                "response_modalities": ["TEXT"],
+                "save_output": False,
+            },
+            {
+                "step": 2,
+                "name": "step2",
+                "description": "test",
+                "prompt": "test prompt",
+                "image_path": None,
+                "guide_image_path": self.guide_img,
+                "save_output": False,
+            },
+            {
+                "step": 3,
+                "name": "step3",
+                "description": "test",
+                "prompt": "test prompt",
+                "image_path": None,
+                "save_output": False,
+                "include_prev_texts": False,
+                "fresh_session": True,
+            },
+        ]
+
+        stub = self._SessionTrackingStub([
+            StepResponse(text=step1_text, images=[]),
+            StepResponse(text="Step 2 output", images=[MagicMock()]),
+            StepResponse(text="Step 3 output", images=[MagicMock()]),
+        ])
+        with patch("core.pipeline.GeminiClient", lambda: stub), patch.object(
+            pipeline_module.OutputHandler, "save_final"
+        ):
+            pipeline = Pipeline(steps=steps, output_dir=Path(self.tmp))
+            pipeline.run(skip_initial_selection=True)
+
+        # 파이프라인 시작 시 1회 + Step 3 직전 fresh_session으로 1회 = 총 2회
+        self.assertEqual(stub.start_chat_call_count, 2)
+
+        step3_parts = stub.sent_parts[2]
+        step3_text_parts = [p for p in step3_parts if isinstance(p, str)]
+        self.assertNotIn(step1_text, " ".join(step3_text_parts))
+
+    def test_save_final_history_includes_turns_before_and_after_fresh_session(self):
+        """세션을 끊기 전(Step 1·2)과 끊은 후(Step 3)의 히스토리가 모두
+        save_final에 넘겨진 chat_history에 들어 있어야 합니다. Pipeline.run에서
+        _history_archive를 합치지 않고 self._client.chat_history만 넘기면
+        이 테스트가 실패해야 합니다(끊기 전 턴이 사라집니다)."""
+        steps = [
+            {
+                "step": 1,
+                "name": "step1",
+                "description": "test",
+                "prompt": "test prompt",
+                "image_path": self.shoe_img,
+                "response_modalities": ["TEXT"],
+                "save_output": False,
+            },
+            {
+                "step": 2,
+                "name": "step2",
+                "description": "test",
+                "prompt": "test prompt",
+                "image_path": None,
+                "guide_image_path": self.guide_img,
+                "save_output": False,
+            },
+            {
+                "step": 3,
+                "name": "step3",
+                "description": "test",
+                "prompt": "test prompt",
+                "image_path": None,
+                "save_output": False,
+                "include_prev_texts": False,
+                "fresh_session": True,
+            },
+        ]
+
+        stub = self._SessionTrackingStub([
+            StepResponse(text="Step 1 output", images=[]),
+            StepResponse(text="Step 2 output", images=[MagicMock()]),
+            StepResponse(text="Step 3 output", images=[MagicMock()]),
+        ])
+        with patch("core.pipeline.GeminiClient", lambda: stub), patch.object(
+            pipeline_module.OutputHandler, "save_final"
+        ) as mock_save_final:
+            pipeline = Pipeline(steps=steps, output_dir=Path(self.tmp))
+            pipeline.run(skip_initial_selection=True)
+
+            self.assertTrue(mock_save_final.called)
+            saved_history = mock_save_final.call_args.kwargs.get("chat_history")
+            # 끊기 전(Step 1·2) 세션의 턴과, 끊은 후(Step 3) 세션의 턴이 모두 있어야 합니다.
+            self.assertIn("turn:Step 1 output", saved_history)
+            self.assertIn("turn:Step 2 output", saved_history)
+            self.assertIn("turn:Step 3 output", saved_history)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -161,8 +161,18 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("미확인", survey)
         self.assertIn('"coverage"', survey)
 
-    def test_line_art_cross_checks_the_survey(self):
-        self.assertIn('"survey_rule"', PIPELINE_STEPS[2]["prompt"])
+    def test_line_art_does_not_reference_the_survey(self):
+        """Step 3는 이제 독립 채팅 세션(fresh_session)으로 돌아가 명세서가
+        존재하지 않습니다. survey_rule(명세서 대조 규칙)은 없어야 하고,
+        광택/하이라이트를 부품 경계로 착각하지 말라는 규칙은 caution으로
+        옮겨져 남아 있어야 합니다."""
+        prompt = PIPELINE_STEPS[2]["prompt"]
+        self.assertNotIn('"survey_rule"', prompt)
+        self.assertIn(
+            "**광택 차이나 하이라이트 경계를 부품 경계로 착각해서 선을 긋지 마. 선은 실제 부품 경계와 재봉선에만 그어**",
+            prompt,
+        )
+        self.assertTrue(PIPELINE_STEPS[2].get("fresh_session"))
 
     def test_survey_records_left_right_presence_and_counts(self):
         """좌우 판정과 개수가 없으면 복원 단계가 몇 개를 그릴지 정하지 못합니다."""

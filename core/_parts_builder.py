@@ -9,7 +9,7 @@ Parts Builder
 3스텝 파이프라인에서는 각 단계별로 다음과 같이 됩니다.
   Step 1: [라벨, 신발 사진, 라벨, 신발 사진, ..., 프롬프트]
   Step 2: [가이드라인, Step 1 명세서, 프롬프트]
-  Step 3: [Step 2 생성 이미지, Step 1 명세서, 프롬프트]
+  Step 3: [Step 2 생성 이미지, 프롬프트] (명세서 미포함 — include_prev_texts=False)
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ def build_step_parts(
     max_images: int | None = None,
     view_images: list[tuple[str, Path]] | None = None,
     reference_images: list[tuple[str, object]] | None = None,
+    include_prev_texts: bool = True,
 ) -> list:
     """각 단계별 parts 리스트를 조립하여 반환합니다.
 
@@ -51,6 +52,7 @@ def build_step_parts(
         max_images      : 폴더에서 불러올 이미지 최대 장수 (None이면 전부)
         view_images     : (라벨, 경로) 목록. 주어지면 image_path 대신 이것을 쓴다
         reference_images: (라벨, 이미 로드된 이미지) 목록. parts 맨 앞에 붙는다
+        include_prev_texts: False면 이전 단계 텍스트(명세서 등)를 넣지 않는다
     """
     # ── 1. 현재 단계의 주 입력 이미지 + 프롬프트 로드 ──────────────────
     if prebuilt_parts is not None:
@@ -71,7 +73,8 @@ def build_step_parts(
     parts = _prepend_reference_images(parts, reference_images)
 
     # ── 4. 이전 단계 텍스트를 프롬프트 바로 앞에 삽입 ──────────────────
-    parts = _insert_prev_texts(parts, prev_texts)
+    if include_prev_texts:
+        parts = _insert_prev_texts(parts, prev_texts)
 
     return parts
 
