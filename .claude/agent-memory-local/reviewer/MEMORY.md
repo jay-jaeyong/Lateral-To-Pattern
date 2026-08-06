@@ -1,0 +1,1 @@
+- [Step 3 명세서 제거의 절반짜리 효과](project_step3_survey_removal.md) — include_prev_texts=False는 parts에서만 빼고 채팅 히스토리는 그대로 남는다
