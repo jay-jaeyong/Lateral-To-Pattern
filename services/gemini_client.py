@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import time
 import logging
+from io import BytesIO
 from pathlib import Path
 
 from PIL import Image as PILImage
@@ -40,6 +41,9 @@ class GeminiClient:
     def __init__(self) -> None:
         self._client = genai.Client(api_key=get_api_key())
         self._chat = None
+        # 세션을 새로 시작할 때 이전 세션의 대화를 여기에 옮겨 보관합니다.
+        # (기록 저장용. 모델에는 현재 세션의 히스토리만 전달됩니다.)
+        self._archived_history: list = []
         logger.info("GeminiClient 초기화 완료 (모델: %s)", MODEL_NAME)
 
     # ──────────────────────────────────────────────────
@@ -47,16 +51,31 @@ class GeminiClient:
     # ──────────────────────────────────────────────────
 
     def start_chat(self) -> None:
-        """새 채팅 세션을 시작합니다. 기존 히스토리는 초기화됩니다."""
+        """새 채팅 세션을 시작합니다.
+
+        모델이 보는 컨텍스트는 완전히 비워집니다. 기존 대화는 기록용으로만
+        _archived_history에 옮겨 보관하며, 이후 API 요청에는 포함되지 않습니다.
+        """
+        if self._chat is not None:
+            try:
+                self._archived_history.extend(list(self._chat.get_history()))
+            except Exception:
+                logger.debug("이전 세션 히스토리 보관 실패 (무시)")
+
         self._chat = self._client.chats.create(
             model=MODEL_NAME,
             config=CHAT_CONFIG,
         )
-        logger.info("새 채팅 세션 시작")
+        logger.info("새 채팅 세션 시작 (모델 컨텍스트 초기화)")
 
     @property
     def chat_history(self) -> list:
-        """현재 채팅 히스토리를 반환합니다."""
+        """전체 대화 기록을 반환합니다(이전 세션 + 현재 세션). 저장용."""
+        return [*self._archived_history, *self.current_history]
+
+    @property
+    def current_history(self) -> list:
+        """현재 세션의 히스토리만 반환합니다. 실제로 모델에 전달되는 컨텍스트입니다."""
         if self._chat is None:
             return []
         return list(self._chat.get_history())
@@ -118,8 +137,19 @@ class GeminiClient:
             if isinstance(p, dict):
                 sanitized.append(p)
                 continue
-            # 마지막 수단: repr로 변환
-            logger.info("허용되지 않는 파트 타입 발견(%s) — repr으로 변환하여 전송합니다.", type(p))
+            # 이미지 바이트를 들고 있는 객체(genai types.Image 등)는 PIL로 변환해 전송
+            pil = self._to_pil(p)
+            if pil is not None:
+                logger.info("이미지 파트(%s)를 PIL로 변환해 전송합니다.", type(p).__name__)
+                sanitized.append(pil)
+                continue
+
+            # 마지막 수단: repr로 변환 (이미지가 텍스트로 전달되면 다음 단계가 그림을 못 봅니다)
+            logger.warning(
+                "허용되지 않는 파트 타입 발견(%s) — repr 문자열로 전송합니다. "
+                "이미지였다면 다음 단계가 그림을 보지 못합니다.",
+                type(p),
+            )
             sanitized.append(repr(p)[:1000])
 
         parts = sanitized
@@ -178,6 +208,33 @@ class GeminiClient:
     # ──────────────────────────────────────────────────
 
     @staticmethod
+    def _to_pil(image) -> PILImage.Image | None:
+        """응답 이미지를 PIL Image로 변환합니다.
+
+        주의: part.as_image()는 이름과 달리 PIL이 아니라 google.genai.types.Image를
+        반환합니다. 이 객체를 그대로 다음 단계 요청 parts에 넣으면 SDK가 이미지로
+        인식하지 못하고 repr 문자열로 전송되어, 다음 단계가 이미지를 못 보게 됩니다.
+        그래서 응답을 받는 즉시 PIL로 변환해 보관합니다.
+
+        Returns:
+            PIL Image, 변환할 수 없으면 None.
+        """
+        if isinstance(image, PILImage.Image):
+            return image
+
+        data = getattr(image, "image_bytes", None)
+        if not data:
+            return None
+
+        try:
+            pil = PILImage.open(BytesIO(data))
+            pil.load()  # BytesIO에서 즉시 읽어들여 이후 재사용/전송이 가능하게 함
+            return pil
+        except Exception:
+            logger.exception("응답 이미지를 PIL로 변환하지 못했습니다.")
+            return None
+
+    @staticmethod
     def _parse_response(response) -> StepResponse:
         """API 응답에서 텍스트와 이미지를 추출합니다."""
         text_parts: list[str] = []
@@ -192,8 +249,16 @@ class GeminiClient:
                 text_parts.append(part.text)
             else:
                 img = part.as_image()
-                if img is not None:
-                    images.append(img)
+                if img is None:
+                    continue
+                pil = GeminiClient._to_pil(img)
+                if pil is not None:
+                    images.append(pil)
+                else:
+                    logger.warning(
+                        "생성 이미지를 PIL로 변환하지 못했습니다 — 다음 단계 입력에서 빠집니다 (타입: %s)",
+                        type(img).__name__,
+                    )
 
         return StepResponse(
             text="\n".join(text_parts).strip(),
@@ -242,7 +307,8 @@ class GeminiClient:
             return f"<chat history formatting failed: {exc}>"
 
     def _format_chat_history_for_log_inner(self) -> str:
-        history = self.chat_history
+        # 실제로 모델에 전달되는 컨텍스트(현재 세션)만 보여줍니다.
+        history = self.current_history
         if not history:
             return "<empty chat history>"
 

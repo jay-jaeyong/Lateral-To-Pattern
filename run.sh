@@ -62,20 +62,20 @@ if [ ! -s "config/APIkey" ] \
 fi
 
 # ── 3. 입력 이미지 확인 ───────────────────────────────────────────────────────
-# images/ 는 .gitignore 대상이라 clone 직후에는 비어 있습니다.
-# images/ 바로 아래에 신발 사진들과 가이드라인 이미지를 두면 됩니다.
-img_files="$(find images -maxdepth 1 -type f \
+# data/ 는 .gitignore 대상이라 clone 직후에는 비어 있습니다.
+data_files="$(find data -maxdepth 1 -type f \
     \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) 2>/dev/null || true)"
 
-if [ -z "$img_files" ]; then
-    echo "[run.sh] images/ 바로 아래에 이미지가 없습니다. 다음처럼 넣어주세요:"
-    echo "         images/가이드라인.jpg     ← 펼칠 틀 (파일명에 '가이드라인' 포함)"
-    echo "         images/나이키 탄준.jpg    ← 신발 실물 사이드뷰 (여러 장 가능)"
+if [ -z "$data_files" ]; then
+    echo "[run.sh] data/ 바로 아래에 이미지가 없습니다. 다음처럼 넣어주세요:"
+    echo "         data/가이드라인.jpg     ← 펼칠 틀 (파일명에 '가이드라인' 포함)"
+    echo "         data/나이키 탄준.jpg    ← 신발 실물 사이드뷰 (여러 장 가능)"
+    echo "         자세한 내용: data/README.md"
     exit 1
 fi
 
-if ! printf '%s\n' "$img_files" | grep -qiE '가이드라인|가이드|guideline|guide'; then
-    echo "[run.sh] images/ 에서 가이드라인 이미지를 찾지 못했습니다."
+if ! printf '%s\n' "$data_files" | grep -qiE '가이드라인|가이드|guideline|guide'; then
+    echo "[run.sh] data/ 에서 가이드라인 이미지를 찾지 못했습니다."
     echo "         파일명에 '가이드라인'(또는 guideline)이 들어간 이미지를 넣어주세요."
     exit 1
 fi

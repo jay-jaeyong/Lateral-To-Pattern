@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from config.prompts import GUIDELINE_OPACITY
 from handlers.image_handler import ImageHandler
 
 logger = logging.getLogger(__name__)
@@ -93,14 +94,17 @@ def _load_guide_images(guide_path: Path) -> list:
 
     폴더라면 파일명에 '가이드라인'(또는 guideline) 키워드가 들어간 이미지를 먼저 찾고,
     없으면 폴더 안의 이미지를 전부 사용합니다.
+
+    로드한 가이드라인은 config.prompts.GUIDELINE_OPACITY 만큼 연하게 처리해서
+    전달합니다(모델이 가이드 선을 결과물에 따라 그리지 않게 하기 위함).
     """
     if guide_path.is_file():
-        return [ImageHandler.load(guide_path)]
+        return [ImageHandler.load_faded(guide_path, GUIDELINE_OPACITY)]
 
     if guide_path.is_dir():
         found = ImageHandler.find_guideline(guide_path)
         if found:
-            return [ImageHandler.load(found)]
+            return [ImageHandler.load_faded(found, GUIDELINE_OPACITY)]
 
         logger.warning(
             "'%s'에서 가이드라인 키워드(%s)가 들어간 파일을 찾지 못했습니다 — 폴더 내 이미지를 사용합니다.",
@@ -110,7 +114,7 @@ def _load_guide_images(guide_path: Path) -> list:
         images = []
         for f in ImageHandler.list_image_files(guide_path):
             try:
-                images.append(ImageHandler.load(f))
+                images.append(ImageHandler.load_faded(f, GUIDELINE_OPACITY))
             except Exception as exc:
                 logger.warning("가이드라인 이미지 로드 실패: %s — %s", f, exc)
         return images

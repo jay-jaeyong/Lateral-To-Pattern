@@ -1,7 +1,7 @@
 # Lateral-To-Pattern
 
 신발 측면(Lateral) 실물 사진을 입력받아 Gemini AI로 재단 패턴(Pattern)을 자동 생성하는 도구입니다.
-현재는 **패턴 펼치기 단일 스텝**만 실행합니다.
+현재는 **패턴 펼치기 → 라인 아트 변환** 2스텝으로 동작합니다.
 
 ---
 
@@ -9,7 +9,9 @@
 
 ```
 [신발 실물 사진(사이드뷰) + 2D 펼침 가이드라인(틀) + 프롬프트]
-    → Gemini API (패턴 펼치기)
+    → Gemini API (Step 1 · 패턴 펼치기)
+    → [Step 1 생성 이미지 + 프롬프트]
+    → Gemini API (Step 2 · 라인 아트 변환)
     → output/ 저장
 ```
 
@@ -48,10 +50,13 @@ Lateral-To-Pattern/
 │   ├── cli.py               # CLI 인자 파서, 이미지 경로 오버라이드
 │   └── logging_utils.py     # Step 컨텍스트 로그 필터
 │
-├── images/                  # 입력 이미지 (전부 여기 바로 아래에 둡니다)
+├── data/                    # ★ 입력 이미지 (이 브랜치는 여기를 사용)
+│   ├── README.md            # 파일 배치 규칙
 │   ├── 가이드라인.jpg        # 파일명에 '가이드라인' 포함 → 펼칠 틀로 자동 인식
 │   ├── 나이키 탄준.jpg       # 나머지 이미지 = 신발 실물 사이드뷰
 │   └── 뉴발란스 992.png
+│
+├── images/                  # (미사용) 이전 모델 폴더 구조 — main 브랜치 방식
 │
 └── output/                  # 생성 결과
     └── {선택한 이미지 이름}/
@@ -66,17 +71,18 @@ Lateral-To-Pattern/
 
 가이드라인 판별 키워드는 `가이드라인`, `가이드`, `guideline`, `guide` 입니다
 ([handlers/image_handler.py](handlers/image_handler.py)의 `GUIDELINE_KEYWORDS`).
+`data/` 하위에 모델명 폴더를 두면 폴더 선택 모드로도 동작합니다.
 
 ---
 
 ## 데이터 흐름
 
-### 패턴 펼치기 (단일 스텝)
+### Step 1 — 패턴 펼치기
 
 | 항목 | 내용 |
 |------|------|
-| **주 입력 이미지** | `images/` 안에서 고른 신발 실물 사진(사이드뷰) |
-| **가이드라인 이미지** | `images/` 안에서 이름으로 찾은 2D 펼침 가이드라인(틀) |
+| **주 입력 이미지** | `data/` 안에서 고른 신발 실물 사진(사이드뷰) |
+| **가이드라인 이미지** | `data/` 안에서 파일명으로 찾은 2D 펼침 가이드라인(틀) |
 | **선택 방식** | 실행 시 콘솔에서 이미지 번호 입력 (`all` 입력 시 전부 순서대로 실행) |
 | **프롬프트** | Upper를 3D→2D로 전개, 가이드라인에 빈틈없이 밀착, 흑백 라인 아트 |
 | **API 입력** | `[실물_사이드뷰_사진, 가이드라인_이미지, 프롬프트]` |
@@ -143,21 +149,23 @@ echo "GEMINI_API_KEY=your_api_key" > .env
 ### 3. 이미지 배치
 
 ```
-images/가이드라인.jpg      ← 2D 펼침 가이드라인(틀). 파일명에 '가이드라인' 포함
-images/나이키 탄준.jpg     ← 신발 실물 사이드뷰. 여러 장 넣으면 실행 시 선택
-images/뉴발란스 992.png
+data/가이드라인.jpg      ← 2D 펼침 가이드라인(틀). 파일명에 '가이드라인' 포함
+data/나이키 탄준.jpg     ← 신발 실물 사이드뷰. 여러 장 넣으면 실행 시 선택
+data/뉴발란스 992.png
 ```
+
+자세한 규칙은 [data/README.md](data/README.md) 참고.
 
 ### 4. 실행
 
 ```bash
-# 기본 실행 (콘솔에서 모델 폴더 선택)
+# 기본 실행 (콘솔에서 이미지 선택)
 ./run.sh
 # 또는
 uv run python main.py
 
 # 이미지 직접 지정 (선택 과정 건너뛰기)
-./run.sh --shoe-image "images/나이키 탄준.jpg" --guide-image "images/가이드라인.jpg"
+./run.sh --shoe-image "data/나이키 탄준.jpg" --guide-image "data/가이드라인.jpg"
 
 # 출력 폴더명 지정
 python main.py --run-label my_run
@@ -171,10 +179,11 @@ python main.py --verbose
 ## 출력 결과
 
 ```
-output/{모델명}/
-├── step_01_pattern_unfold.md   # 입력·프롬프트·응답
-├── final_output.md             # 최종 응답 전문
-└── chat_history.json           # 전체 채팅 히스토리 (JSON)
+output/{선택한 이미지 이름}/
+├── step_01_pattern_unfold.md        # 입력·프롬프트·응답
+├── step_02_line_art_conversion.md
+├── final_output.md                  # 최종 응답 전문
+└── chat_history.json                # 전체 채팅 히스토리 (JSON)
 ```
 
 생성된 이미지는 Markdown 파일과 동일한 폴더에 저장됩니다.

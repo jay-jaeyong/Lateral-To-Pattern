@@ -10,6 +10,10 @@ Pipeline
 
 여러 단계를 정의하면 이전 단계의 응답을 채팅 히스토리로 유지한 채 순차 실행되므로,
 Gemini는 전체 대화 맥락을 가지고 각 단계에 응답합니다.
+
+단, 단계 설정에 fresh_chat=True를 주면 그 단계는 새 채팅 세션에서 실행됩니다.
+앞 단계의 대화(원본 신발 사진, 가이드라인, 프롬프트)를 모델이 보지 못하고
+'바로 앞 단계가 생성한 이미지'만 입력으로 받습니다.
 """
 
 from __future__ import annotations
@@ -215,10 +219,31 @@ class Pipeline:
 
             step_config = self._resolve_step_images(step_config, model_name, is_first=(index == 0))
 
+            # fresh_chat=True인 단계는 새 세션에서 시작합니다.
+            # 앞 단계의 대화(원본 신발 사진, 가이드라인 등)를 모델이 보지 못하게 하고,
+            # 바로 앞 단계가 생성한 이미지만 입력으로 받습니다.
+            if step_config.get("fresh_chat") and index > 0:
+                logger.info(
+                    "Step %d: fresh_chat — 새 세션에서 실행합니다 (원본 사진·가이드라인을 전달하지 않음)",
+                    step_config["step"],
+                )
+                self._client.start_chat()
+                last = pipeline_result.steps[-1] if pipeline_result.steps else None
+                step_prev_images = list(last.generated_images) if last and last.generated_images else []
+                step_prev_texts: list[str] = []
+                if not step_prev_images:
+                    logger.warning(
+                        "Step %d: 앞 단계 생성 이미지가 없습니다 — 프롬프트만으로 진행합니다.",
+                        step_config["step"],
+                    )
+            else:
+                step_prev_images = previous_images
+                step_prev_texts = previous_texts
+
             step_result = self._run_step(
                 step_config,
-                previous_texts,
-                previous_images,
+                step_prev_texts,
+                step_prev_images,
                 prebuilt_parts=prebuilt_parts if index == 0 else None,
             )
 

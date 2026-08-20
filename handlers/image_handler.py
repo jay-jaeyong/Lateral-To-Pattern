@@ -95,6 +95,38 @@ class ImageHandler:
         return image
 
     @staticmethod
+    def fade(image: Image.Image, opacity: float) -> Image.Image:
+        """이미지를 흰 배경 쪽으로 블렌딩해 연하게 만듭니다.
+
+        가이드라인(틀) 이미지의 선을 옅게 죽여서, 모델이 그 선을 결과물에
+        따라 그리지 않게 하려는 용도입니다. 선 위치는 그대로 남습니다.
+
+        Args:
+            image  : 원본 이미지.
+            opacity: 남길 진하기 (0.0 = 완전 흰색, 1.0 = 원본 그대로).
+                     예) 0.15면 검은 선이 아주 연한 회색이 됩니다.
+
+        Returns:
+            연하게 만든 새 이미지 (opacity가 1 이상이면 원본 그대로).
+        """
+        if opacity >= 1.0:
+            return image
+
+        opacity = max(0.0, opacity)
+        rgb = image.convert("RGB")
+        white = Image.new("RGB", rgb.size, (255, 255, 255))
+        return Image.blend(white, rgb, opacity)
+
+    @staticmethod
+    def load_faded(image_path: Path | str, opacity: float) -> Image.Image:
+        """이미지를 로드한 뒤 연하게 만들어 반환합니다."""
+        image = ImageHandler.load(image_path)
+        if opacity >= 1.0:
+            return image
+        logger.info("가이드라인 이미지를 연하게 처리했습니다 (opacity=%.2f): %s", opacity, image_path)
+        return ImageHandler.fade(image, opacity)
+
+    @staticmethod
     def build_parts(prompt: str, image_path: Path | str | None, max_images: int | None = None) -> list:
         """Gemini API에 전달할 parts 리스트를 구성합니다.
 
@@ -117,21 +149,7 @@ class ImageHandler:
             path = Path(image_path)
 
             if path.is_dir():
-                # ── 폴더 바로 아래 이미지 파일이 있으면 파일 선택 모드 ────────────
-                # (가이드라인 파일은 후보에서 제외합니다.)
-                files = ImageHandler.list_image_files(path, exclude_guideline=True)
-
-                if files:
-                    selected_files = ImageHandler._select_entries(path, files, kind="이미지")
-                    ImageHandler._last_selected_files = selected_files
-                    ImageHandler._last_selection_was_all = len(selected_files) == len(files)
-
-                    # 선택된 첫 번째 파일을 로드합니다.
-                    # (batch "all" 실행 시 pipeline이 나머지 파일을 순회합니다.)
-                    logger.info("입력 이미지 선택: %s", selected_files[0])
-                    return [ImageHandler.load(selected_files[0]), prompt]
-
-                # ── 이미지 파일이 없고 서브폴더가 있으면 폴더 선택 모드 ───────────
+                # ── 서브폴더(모델 폴더)가 있으면 폴더 선택 모드 ───────────────────
                 subdirs = sorted(
                     [child for child in path.iterdir()
                      if child.is_dir() and not child.name.startswith(".")]
@@ -143,7 +161,20 @@ class ImageHandler:
                     ImageHandler._last_selection_was_all = len(selected_dirs) == len(subdirs)
 
                     # 선택된 첫 번째 폴더의 이미지를 로드합니다.
+                    # (batch "all" 실행 시 pipeline이 나머지 폴더를 순회합니다.)
                     return ImageHandler._load_dir_images(selected_dirs[0], prompt, max_images)
+
+                # ── 서브폴더가 없으면 폴더 안 이미지 파일 선택 모드 ───────────────
+                # (가이드라인 파일은 후보에서 제외합니다.)
+                files = ImageHandler.list_image_files(path, exclude_guideline=True)
+
+                if files:
+                    selected_files = ImageHandler._select_entries(path, files, kind="이미지")
+                    ImageHandler._last_selected_files = selected_files
+                    ImageHandler._last_selection_was_all = len(selected_files) == len(files)
+
+                    logger.info("입력 이미지 선택: %s", selected_files[0])
+                    return [ImageHandler.load(selected_files[0]), prompt]
 
                 logger.info("폴더에 이미지가 없습니다: %s", path)
                 return [prompt]
