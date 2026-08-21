@@ -35,6 +35,20 @@ from PIL import Image as PILImage
 logger = logging.getLogger(__name__)
 
 
+def _as_pil_image(image):
+    """Gemini가 돌려주는 genai.types.Image를 PIL Image로 바꿉니다.
+
+    postprocess_sketch는 PIL Image(.size, .load() 등)를 요구하지만, API 응답의
+    생성 이미지는 이미 PIL 타입인 경우도(테스트) 있고 genai.types.Image인
+    경우도(실제 API 호출) 있어 여기서 통일합니다. 이미 PIL Image면 그대로
+    반환합니다(같은 객체를 유지해야 하는 호출부가 있음).
+    """
+    if isinstance(image, PILImage.Image):
+        return image
+    import io
+    return PILImage.open(io.BytesIO(image.image_bytes))
+
+
 class Pipeline:
     """순차적 멀티스텝 Gemini 채팅 파이프라인.
 
@@ -423,7 +437,9 @@ class Pipeline:
             )
 
             if config.get("postprocess_sketch"):
-                step_response.images = [postprocess_sketch(image) for image in step_response.images]
+                step_response.images = [
+                    postprocess_sketch(_as_pil_image(image)) for image in step_response.images
+                ]
 
             if response_modalities and "TEXT" in response_modalities and not step_response.text:
                 logger.warning(

@@ -22,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.pipeline import Pipeline  # noqa: F401  (import 순서로 순환참조를 피함)
+from core.pipeline import Pipeline, _as_pil_image  # noqa: F401  (import 순서로 순환참조를 피함)
 from config.prompts import PIPELINE_STEPS
 from handlers.image_handler import ImageHandler
 from services.gemini_client import GeminiClient
@@ -64,7 +64,7 @@ def convert_one(color_path: Path, output_dir: Path = OUT_DIR) -> Path | None:
         logger.error("실패(이미지 없음): %s — 응답 텍스트: %s", color_path.name, response.text[:300])
         return None
 
-    postprocess_sketch(response.images[0]).save(out_path)
+    postprocess_sketch(_as_pil_image(response.images[0])).save(out_path)
     logger.info("완료: %s", out_path)
     return out_path
 
