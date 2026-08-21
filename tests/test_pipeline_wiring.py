@@ -360,6 +360,54 @@ class PipelineWiringTest(unittest.TestCase):
             self.assertIn("turn:Step 2 output", saved_history)
             self.assertIn("turn:Step 3 output", saved_history)
 
+    def test_opted_in_step_postprocesses_before_save_and_result(self):
+        raw = Image.new("RGB", (8, 8), "blue")
+        processed = Image.new("RGB", (8, 8), "white")
+        step = {
+            "step": 3,
+            "name": "line_art_conversion",
+            "description": "sketch",
+            "prompt": "prompt",
+            "image_path": None,
+            "postprocess_sketch": True,
+        }
+
+        with patch("core.pipeline.GeminiClient") as MockClient, patch(
+            "core.pipeline.postprocess_sketch", return_value=processed
+        ) as postprocess:
+            MockClient.return_value.send.return_value = StepResponse(images=[raw])
+            pipeline = Pipeline(steps=[step], output_dir=self.tmp)
+            pipeline._output_handler.save_step = MagicMock(return_value=self.tmp / "step.md")
+
+            result = pipeline._run_step(step)
+
+        postprocess.assert_called_once_with(raw)
+        saved = pipeline._output_handler.save_step.call_args.kwargs["generated_images"]
+        self.assertIs(saved[0], processed)
+        self.assertIs(result.generated_images[0], processed)
+
+    def test_unflagged_step_keeps_original_generated_image(self):
+        raw = Image.new("RGB", (8, 8), "blue")
+        step = {
+            "step": 2,
+            "name": "pattern_unfold",
+            "description": "color",
+            "prompt": "prompt",
+            "image_path": None,
+            "save_output": False,
+        }
+
+        with patch("core.pipeline.GeminiClient") as MockClient, patch(
+            "core.pipeline.postprocess_sketch"
+        ) as postprocess:
+            MockClient.return_value.send.return_value = StepResponse(images=[raw])
+            pipeline = Pipeline(steps=[step], output_dir=self.tmp)
+
+            result = pipeline._run_step(step)
+
+        postprocess.assert_not_called()
+        self.assertIs(result.generated_images[0], raw)
+
 
 if __name__ == "__main__":
     unittest.main()
