@@ -4,7 +4,7 @@ import unittest
 from pydantic import ValidationError
 
 from config.survey_schema import Survey, Part, Marking, Symmetry
-from config.gemini_config import build_response_config
+from config.gemini_config import IMAGE_CONFIG, build_response_config
 
 
 class SymmetryValidationTest(unittest.TestCase):
@@ -215,6 +215,22 @@ class BuildResponseConfigWithSchemaTest(unittest.TestCase):
         """modalities가 빈 목록이면 response_schema가 있어도 None을 반환합니다."""
         config = build_response_config([], response_schema=Survey)
         self.assertIsNone(config)
+
+    def test_input_aspect_request_uses_4k_without_explicit_ratio(self):
+        config = build_response_config(None, match_input_aspect_ratio=True)
+
+        self.assertIsNotNone(config)
+        self.assertEqual(list(config.response_modalities), ["IMAGE"])
+        self.assertEqual(config.image_config.image_size, "4K")
+        self.assertIsNone(config.image_config.aspect_ratio)
+
+    def test_default_image_config_remains_four_k_two_by_three(self):
+        self.assertEqual(IMAGE_CONFIG.image_size, "4K")
+        self.assertEqual(IMAGE_CONFIG.aspect_ratio, "2:3")
+
+    def test_default_none_modalities_behavior_is_unchanged(self):
+        self.assertIsNone(build_response_config(None))
+        self.assertIsNone(build_response_config(None, response_schema=Survey))
 
 
 class PipelineWiringTest(unittest.TestCase):

@@ -23,16 +23,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import core  # noqa: F401  (services보다 먼저 core를 로드해 core.pipeline<->services.gemini_client 순환참조를 피함)
+from config.gemini_config import build_response_config
 from config.prompts import PIPELINE_STEPS
 from handlers.image_handler import ImageHandler
 from services.gemini_client import GeminiClient
-from utils.sketch_postprocessor import postprocess_sketch, _as_pil_image
 
 logger = logging.getLogger("run_step3_on_color_patterns")
 
 SRC_DIR = Path("images/new_patterns")
-OUT_DIR = SRC_DIR / "v2"
-STEP3_PROMPT = next(s["prompt"] for s in PIPELINE_STEPS if s["name"] == "line_art_conversion")
+STEP3 = next(
+    step for step in PIPELINE_STEPS if step["name"] == "line_art_conversion"
+)
+OUT_DIR = SRC_DIR / "v3"
+STEP3_PROMPT = STEP3["prompt"]
 MAX_WORKERS = 6
 
 
@@ -58,13 +61,21 @@ def convert_one(color_path: Path, output_dir: Path = OUT_DIR) -> Path | None:
     image = ImageHandler.load(color_path)
     client = GeminiClient()
     client.start_chat()
-    response = client.send([image, STEP3_PROMPT])
+    response = client.send(
+        [image, STEP3_PROMPT],
+        config=build_response_config(
+            None,
+            match_input_aspect_ratio=STEP3.get(
+                "match_input_aspect_ratio", False
+            ),
+        ),
+    )
 
     if not response.images:
         logger.error("실패(이미지 없음): %s — 응답 텍스트: %s", color_path.name, response.text[:300])
         return None
 
-    postprocess_sketch(_as_pil_image(response.images[0])).save(out_path)
+    response.images[0].save(out_path)
     logger.info("완료: %s", out_path)
     return out_path
 

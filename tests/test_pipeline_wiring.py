@@ -1,6 +1,5 @@
 """파이프라인과 config 연결 상태 테스트."""
 
-import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,7 +9,7 @@ from PIL import Image
 
 import core.pipeline as pipeline_module
 from config.prompts import PIPELINE_STEPS
-from core.pipeline import Pipeline, _as_pil_image
+from core.pipeline import Pipeline
 from core.models import StepResponse
 from utils.cli import VIEW_FLAGS
 
@@ -361,80 +360,48 @@ class PipelineWiringTest(unittest.TestCase):
             self.assertIn("turn:Step 2 output", saved_history)
             self.assertIn("turn:Step 3 output", saved_history)
 
-    def test_opted_in_step_postprocesses_before_save_and_result(self):
-        raw = Image.new("RGB", (8, 8), "blue")
-        processed = Image.new("RGB", (8, 8), "white")
+    def test_step3_passes_input_aspect_config_to_client(self):
+        raw = MagicMock()
         step = {
             "step": 3,
             "name": "line_art_conversion",
             "description": "sketch",
             "prompt": "prompt",
             "image_path": None,
-            "postprocess_sketch": True,
-        }
-
-        with patch("core.pipeline.GeminiClient") as MockClient, patch(
-            "core.pipeline.postprocess_sketch", return_value=processed
-        ) as postprocess:
-            MockClient.return_value.send.return_value = StepResponse(images=[raw])
-            pipeline = Pipeline(steps=[step], output_dir=self.tmp)
-            pipeline._output_handler.save_step = MagicMock(return_value=self.tmp / "step.md")
-
-            result = pipeline._run_step(step)
-
-        postprocess.assert_called_once_with(raw)
-        saved = pipeline._output_handler.save_step.call_args.kwargs["generated_images"]
-        self.assertIs(saved[0], processed)
-        self.assertIs(result.generated_images[0], processed)
-
-    def test_unflagged_step_keeps_original_generated_image(self):
-        raw = Image.new("RGB", (8, 8), "blue")
-        step = {
-            "step": 2,
-            "name": "pattern_unfold",
-            "description": "color",
-            "prompt": "prompt",
-            "image_path": None,
             "save_output": False,
+            "match_input_aspect_ratio": True,
         }
 
-        with patch("core.pipeline.GeminiClient") as MockClient, patch(
-            "core.pipeline.postprocess_sketch"
-        ) as postprocess:
+        with patch("core.pipeline.GeminiClient") as MockClient:
             MockClient.return_value.send.return_value = StepResponse(images=[raw])
-            pipeline = Pipeline(steps=[step], output_dir=self.tmp)
+            result = Pipeline(steps=[step], output_dir=self.tmp)._run_step(step)
 
-            result = pipeline._run_step(step)
-
-        postprocess.assert_not_called()
+        config = MockClient.return_value.send.call_args.kwargs["config"]
+        self.assertEqual(config.image_config.image_size, "4K")
+        self.assertIsNone(config.image_config.aspect_ratio)
         self.assertIs(result.generated_images[0], raw)
 
+    def test_generated_image_reaches_save_and_result_unchanged(self):
+        raw = MagicMock()
+        step = {
+            "step": 3,
+            "name": "line_art_conversion",
+            "description": "sketch",
+            "prompt": "prompt",
+            "image_path": None,
+        }
 
-class AsPilImageTest(unittest.TestCase):
-    """core.pipeline._as_pil_image가 genai.types.Image류(PIL이 아닌 객체)를
-    실제로 PIL Image로 변환하는지 확인합니다."""
+        with patch("core.pipeline.GeminiClient") as MockClient:
+            MockClient.return_value.send.return_value = StepResponse(images=[raw])
+            pipeline = Pipeline(steps=[step], output_dir=self.tmp)
+            pipeline._output_handler.save_step = MagicMock(
+                return_value=self.tmp / "step.md"
+            )
+            result = pipeline._run_step(step)
 
-    class _GenaiImageStub:
-        def __init__(self, image_bytes, mime_type="image/png"):
-            self.image_bytes = image_bytes
-            self.mime_type = mime_type
-
-    class _NeitherStub:
-        """PIL Image도 아니고 image_bytes도 없는 객체."""
-
-    def test_converts_genai_image_bytes_to_pil_image(self):
-        buf = io.BytesIO()
-        Image.new("RGB", (12, 9), "blue").save(buf, format="PNG")
-        stub = self._GenaiImageStub(buf.getvalue())
-
-        result = _as_pil_image(stub)
-
-        self.assertIsInstance(result, Image.Image)
-        self.assertEqual(result.size, (12, 9))
-
-    def test_object_without_image_bytes_raises_attribute_error_loudly(self):
-        with self.assertRaises(AttributeError):
-            _as_pil_image(self._NeitherStub())
+        saved = pipeline._output_handler.save_step.call_args.kwargs["generated_images"]
+        self.assertIs(saved[0], raw)
+        self.assertIs(result.generated_images[0], raw)
 
 
 if __name__ == "__main__":

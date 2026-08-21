@@ -29,7 +29,6 @@ from handlers.image_handler import ImageHandler
 from handlers.output_handler import OutputHandler
 from utils.logging_utils import step_context
 from utils.cli import VIEW_FLAGS, label_image_files, resolve_run_label_from_path
-from utils.sketch_postprocessor import postprocess_sketch, _as_pil_image
 from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
@@ -419,13 +418,15 @@ class Pipeline:
             response_modalities = config.get("response_modalities")
             response_schema = config.get("response_schema")
             step_response: StepResponse = self._client.send(
-                parts, config=build_response_config(response_modalities, response_schema=response_schema)
+                parts,
+                config=build_response_config(
+                    response_modalities,
+                    response_schema=response_schema,
+                    match_input_aspect_ratio=config.get(
+                        "match_input_aspect_ratio", False
+                    ),
+                ),
             )
-
-            if config.get("postprocess_sketch"):
-                step_response.images = [
-                    postprocess_sketch(_as_pil_image(image)) for image in step_response.images
-                ]
 
             if response_modalities and "TEXT" in response_modalities and not step_response.text:
                 logger.warning(

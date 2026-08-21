@@ -33,6 +33,8 @@ IMAGE_CONFIG = types.ImageConfig(
     aspect_ratio="2:3",
 )
 
+INPUT_ASPECT_IMAGE_CONFIG = types.ImageConfig(image_size="4K")
+
 # ─────────────────────────────────────────────
 # 안전 설정
 # ─────────────────────────────────────────────
@@ -71,6 +73,7 @@ CHAT_CONFIG = types.GenerateContentConfig(
 def build_response_config(
     modalities: list[str] | None,
     response_schema=None,
+    match_input_aspect_ratio: bool = False,
 ) -> types.GenerateContentConfig | None:
     """스텝 하나만 다른 모달리티로 부를 때 쓸 config를 만듭니다.
 
@@ -81,16 +84,20 @@ def build_response_config(
         modalities: 응답 모달리티 (예: ["TEXT"], ["IMAGE"], None)
         response_schema: Pydantic 모델. 지정하면 응답이 해당 모델의 JSON 스키마로 강제됩니다.
     """
-    if not modalities:
+    if not modalities and not match_input_aspect_ratio:
         return None
 
     kwargs = {
-        "response_modalities": list(modalities),
+        "response_modalities": list(modalities or RESPONSE_MODALITIES),
         "safety_settings": SAFETY_SETTINGS,
         "temperature": 0,
     }
-    if "IMAGE" in modalities:
-        kwargs["image_config"] = IMAGE_CONFIG
+    if "IMAGE" in kwargs["response_modalities"]:
+        kwargs["image_config"] = (
+            INPUT_ASPECT_IMAGE_CONFIG
+            if match_input_aspect_ratio
+            else IMAGE_CONFIG
+        )
     if response_schema is not None:
         kwargs["response_mime_type"] = "application/json"
         kwargs["response_schema"] = response_schema

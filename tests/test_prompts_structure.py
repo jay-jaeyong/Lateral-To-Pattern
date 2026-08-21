@@ -484,12 +484,28 @@ class SketchPatternContractTest(unittest.TestCase):
         for rank in ("1순위", "2순위", "3순위", "4순위", "5순위"):
             self.assertIn(rank, sketch)
 
-    def test_preserves_resolution_canvas_and_pixel_coordinates(self):
-        """겹쳐 보려면 입력과 같은 캔버스에 같은 픽셀 좌표로 나와야 합니다."""
-        sketch = self.sketch()
-        self.assertIn("입력과 같은 해상도와 화면 비율", sketch)
-        self.assertIn("같은 캔버스 범위와 좌표계", sketch)
-        self.assertIn("같은 픽셀 위치", sketch)
+    def test_matches_input_aspect_without_requesting_postprocessing(self):
+        step = PIPELINE_STEPS[2]
+        self.assertIs(step.get("match_input_aspect_ratio"), True)
+        self.assertNotIn("postprocess_sketch", step)
+        self.assertIs(step.get("enabled"), False)
+        self.assertIs(step.get("fresh_session"), True)
+        self.assertIs(step.get("include_prev_texts"), False)
+
+    def test_preserves_normalized_geometry_not_exact_pixel_dimensions(self):
+        prompt = self.sketch()
+        for phrase in (
+            "입력과 같은 화면 비율",
+            "프레이밍",
+            "정규화 좌표",
+            "x/width",
+            "y/height",
+            "곡률",
+            "개별 부품을 이동하지 마",
+        ):
+            self.assertIn(phrase, prompt)
+        self.assertNotIn("입력과 동일한 해상도", prompt)
+        self.assertNotIn("같은 픽셀 위치", prompt)
 
     def test_forbids_reframing_and_beautifying_the_lines(self):
         """모델이 선을 다시 래스터화하면서 예쁘게 고치면 좌표가 어긋납니다."""
@@ -557,7 +573,7 @@ class SketchPatternContractTest(unittest.TestCase):
         sketch = self.sketch()
         self.assertIn('"self_check"', sketch)
         checks = sketch.split('"self_check"', 1)[1]
-        for item in ("해상도", "곡률", "재봉선", "펀칭", "재봉 마진", "순백"):
+        for item in ("화면 비율", "정규화 좌표", "곡률", "재봉선", "펀칭", "재봉 마진", "순백"):
             self.assertIn(item, checks, msg=item)
 
     def test_old_conflicting_instructions_are_gone(self):
@@ -602,6 +618,18 @@ class SketchPatternContractTest(unittest.TestCase):
         self.assertIn("메시 조직의 반복 무늬만 제거", sketch)
         self.assertIn("발목", sketch)
 
+    def test_requires_closed_mesh_part_perimeters(self):
+        prompt = self.sketch()
+        for phrase in (
+            "메시 패턴 파트의 둘레",
+            "닫힌 순환 경계",
+            "정확한 접점",
+            "공유 구간",
+            "평행한 중복선",
+            "메시 조직만 제거",
+        ):
+            self.assertIn(phrase, prompt)
+
     def test_keeps_circular_and_elliptical_punching(self):
         sketch = self.sketch()
         self.assertIn("원형 또는 타원형", sketch)
@@ -614,5 +642,11 @@ class SketchPatternContractTest(unittest.TestCase):
         self.assertIn("순검정(#000000)", sketch)
         self.assertIn("흐릿", sketch)
 
-    def test_enables_shared_sketch_postprocessing(self):
-        self.assertIs(PIPELINE_STEPS[2].get("postprocess_sketch"), True)
+    def test_rendering_allows_only_edge_antialias_gray(self):
+        prompt = self.sketch()
+        self.assertIn("순백", prompt)
+        self.assertIn("순검정", prompt)
+        self.assertIn("검은 선 가장자리", prompt)
+        self.assertIn("중립 회색 안티앨리어싱", prompt)
+        for forbidden in ("유채색 픽셀", "회색 채움", "음영", "재질 표현"):
+            self.assertIn(forbidden, prompt)
