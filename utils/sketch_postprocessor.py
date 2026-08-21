@@ -7,6 +7,10 @@ from PIL import Image, ImageChops, ImageFilter
 REFERENCE_SHORT_SIDE = 3392
 REFERENCE_LINE_WIDTH = 5
 WHITE_THRESHOLD = 250
+# 0.7: 이 저장소의 합성 채움 테스트(큰 사각형을 채운 배경)들이 실제로 관측한
+# 최댓값이 0.625여서, 완전 순백이 아닌 배경(관측값 0.84~1.0)과 구분할
+# 여유(margin)를 두려면 0.5보다 높여야 했다.
+INK_FRACTION_LIMIT = 0.7
 
 
 def _as_pil_image(image):
@@ -53,10 +57,11 @@ def postprocess_sketch(
 ) -> Image.Image:
     width = line_width or scaled_line_width(image.size)
     ink = _nonwhite_mask(image)
+    ink_fraction = ink.histogram()[255] / (image.width * image.height)
+    if ink_fraction > INK_FRACTION_LIMIT:
+        raise ValueError(f"배경이 순백이 아닙니다 (ink 비율 {ink_fraction:.2f})")
     core = ink.filter(ImageFilter.MinFilter(width * 2 + 1))
     retained_lines = ImageChops.subtract(ink, core)
-    if ink.getbbox() and not retained_lines.getbbox():
-        raise ValueError("배경이 순백이 아니어서 전체 캔버스가 채움으로 판정되었습니다")
     centerlines = _skeletonize(retained_lines)
     normalized_lines = centerlines.filter(ImageFilter.MaxFilter(width))
 

@@ -79,6 +79,23 @@ class SketchPostprocessorTest(unittest.TestCase):
 
         self.assertEqual(set(result.getdata()), {(255, 255, 255)})
 
+    def test_raises_when_background_is_noisy_near_white(self):
+        """완전 순백은 아니지만(압축 노이즈 등으로 250 임계값 주변에서
+        흔들리는) 대부분의 배경이 ink로 잡히는 경우도, 완벽하게 채도가
+        찬 경우와 마찬가지로 조용히 실패하지 않고 예외를 던져야 한다."""
+        size = 60
+        image = Image.new("RGB", (size, size), "white")
+        pixels = image.load()
+        for y in range(size):
+            for x in range(size):
+                value = 247 if (x + y) % 8 != 0 else 253
+                pixels[x, y] = (value, value, value)
+        draw = ImageDraw.Draw(image)
+        draw.line((5, 30, 55, 30), fill=(0, 0, 0), width=3)
+
+        with self.assertRaises(ValueError):
+            postprocess_sketch(image, line_width=3)
+
     def test_touching_fills_lose_their_shared_internal_boundary(self):
         """알고리즘이 흑백 마스크만 보므로, 흰 여백 없이 맞닿은 두 채움 영역의
         경계는 사라지고 외곽 실루엣만 남는다 — 이것은 알려진 한계다."""

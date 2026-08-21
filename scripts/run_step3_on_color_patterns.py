@@ -50,6 +50,9 @@ def sketch_output_path(color_path: Path, output_dir: Path = OUT_DIR) -> Path:
 def convert_one(color_path: Path, output_dir: Path = OUT_DIR) -> Path | None:
     output_dir.mkdir(parents=True, exist_ok=True)
     out_path = sketch_output_path(color_path, output_dir)
+    if out_path.exists():
+        logger.info("건너뜀(이미 있음): %s", out_path.name)
+        return out_path
     logger.info("시작: %s → %s", color_path.name, out_path.name)
 
     image = ImageHandler.load(color_path)

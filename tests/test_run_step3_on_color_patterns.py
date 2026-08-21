@@ -50,6 +50,26 @@ class Step3BatchRunnerTest(unittest.TestCase):
             self.assertEqual(output, output_dir / "model_sketch.png")
             self.assertEqual(Image.open(output).getpixel((10, 10)), (255, 255, 255))
 
+    def test_convert_one_skips_when_output_already_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            source = folder / "model_color.png"
+            output_dir = folder / "v2"
+            output_dir.mkdir(parents=True)
+            Image.new("RGB", (20, 20), "white").save(source)
+
+            existing_out = output_dir / "model_sketch.png"
+            Image.new("RGB", (5, 5), "black").save(existing_out)
+            existing_bytes = existing_out.read_bytes()
+
+            with patch.object(
+                runner, "GeminiClient", side_effect=AssertionError("should not be called")
+            ):
+                output = runner.convert_one(source, output_dir)
+
+            self.assertEqual(output, existing_out)
+            self.assertEqual(existing_out.read_bytes(), existing_bytes)
+
 
 if __name__ == "__main__":
     unittest.main()
