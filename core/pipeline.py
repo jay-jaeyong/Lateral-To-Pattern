@@ -29,24 +29,10 @@ from handlers.image_handler import ImageHandler
 from handlers.output_handler import OutputHandler
 from utils.logging_utils import step_context
 from utils.cli import VIEW_FLAGS, label_image_files, resolve_run_label_from_path
-from utils.sketch_postprocessor import postprocess_sketch
+from utils.sketch_postprocessor import postprocess_sketch, _as_pil_image
 from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
-
-
-def _as_pil_image(image):
-    """Gemini가 돌려주는 genai.types.Image를 PIL Image로 바꿉니다.
-
-    postprocess_sketch는 PIL Image(.size, .load() 등)를 요구하지만, API 응답의
-    생성 이미지는 이미 PIL 타입인 경우도(테스트) 있고 genai.types.Image인
-    경우도(실제 API 호출) 있어 여기서 통일합니다. 이미 PIL Image면 그대로
-    반환합니다(같은 객체를 유지해야 하는 호출부가 있음).
-    """
-    if isinstance(image, PILImage.Image):
-        return image
-    import io
-    return PILImage.open(io.BytesIO(image.image_bytes))
 
 
 class Pipeline:

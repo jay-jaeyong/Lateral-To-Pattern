@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""images/color_patterns의 *_color 이미지에 Step 3 프롬프트를 적용합니다.
+"""images/new_patterns의 *_color 이미지에 Step 3 프롬프트를 적용합니다.
 
 Step 3(line_art_conversion)는 파이프라인에서 enabled=False로 꺼져 있어
 main.py 실행으로는 도달하지 않습니다. 이미 만들어둔 컬러 패턴들에 대해
@@ -22,16 +22,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.pipeline import Pipeline, _as_pil_image  # noqa: F401  (import 순서로 순환참조를 피함)
+import core  # noqa: F401  (services보다 먼저 core를 로드해 core.pipeline<->services.gemini_client 순환참조를 피함)
 from config.prompts import PIPELINE_STEPS
 from handlers.image_handler import ImageHandler
 from services.gemini_client import GeminiClient
-from utils.sketch_postprocessor import postprocess_sketch
+from utils.sketch_postprocessor import postprocess_sketch, _as_pil_image
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 logger = logging.getLogger("run_step3_on_color_patterns")
-logging.getLogger("google_genai").setLevel(logging.WARNING)
-logging.getLogger("httpx").setLevel(logging.WARNING)
 
 SRC_DIR = Path("images/new_patterns")
 OUT_DIR = SRC_DIR / "v2"
@@ -70,6 +67,10 @@ def convert_one(color_path: Path, output_dir: Path = OUT_DIR) -> Path | None:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
+    logging.getLogger("google_genai").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
     targets = find_color_patterns(SRC_DIR)
     if not targets:
         logger.error("%s 안에 '_color'가 포함된 이미지가 없습니다.", SRC_DIR)

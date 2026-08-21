@@ -1,5 +1,6 @@
 """파이프라인과 config 연결 상태 테스트."""
 
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,7 +10,7 @@ from PIL import Image
 
 import core.pipeline as pipeline_module
 from config.prompts import PIPELINE_STEPS
-from core.pipeline import Pipeline
+from core.pipeline import Pipeline, _as_pil_image
 from core.models import StepResponse
 from utils.cli import VIEW_FLAGS
 
@@ -407,6 +408,33 @@ class PipelineWiringTest(unittest.TestCase):
 
         postprocess.assert_not_called()
         self.assertIs(result.generated_images[0], raw)
+
+
+class AsPilImageTest(unittest.TestCase):
+    """core.pipeline._as_pil_image가 genai.types.Image류(PIL이 아닌 객체)를
+    실제로 PIL Image로 변환하는지 확인합니다."""
+
+    class _GenaiImageStub:
+        def __init__(self, image_bytes, mime_type="image/png"):
+            self.image_bytes = image_bytes
+            self.mime_type = mime_type
+
+    class _NeitherStub:
+        """PIL Image도 아니고 image_bytes도 없는 객체."""
+
+    def test_converts_genai_image_bytes_to_pil_image(self):
+        buf = io.BytesIO()
+        Image.new("RGB", (12, 9), "blue").save(buf, format="PNG")
+        stub = self._GenaiImageStub(buf.getvalue())
+
+        result = _as_pil_image(stub)
+
+        self.assertIsInstance(result, Image.Image)
+        self.assertEqual(result.size, (12, 9))
+
+    def test_object_without_image_bytes_raises_attribute_error_loudly(self):
+        with self.assertRaises(AttributeError):
+            _as_pil_image(self._NeitherStub())
 
 
 if __name__ == "__main__":
