@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """images/new_patterns의 *_color 이미지에 Step 3 프롬프트를 적용합니다.
 
-Step 3(line_art_conversion)는 파이프라인에서 enabled=False로 꺼져 있어
-main.py 실행으로는 도달하지 않습니다. 이미 만들어둔 컬러 패턴들에 대해
-스케치 패턴 변환만 독립적으로 돌려볼 때 이 스크립트를 씁니다.
+Step 3(line_art_conversion)는 파이프라인에서도 실행되지만, 그 경로는 앞
+단계가 방금 만든 패턴만 받습니다. 이미 폴더에 만들어둔 컬러 패턴들을
+Step 1·2 없이 일괄로 다시 변환할 때 이 스크립트를 씁니다.
 
 각 컬러 패턴은 독립된 요청이라 서로의 채팅 히스토리를 공유할 필요가
 없으므로 이미지마다 새 GeminiClient(=새 채팅 세션)를 만들어 스레드로
@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import core  # noqa: F401  (services보다 먼저 core를 로드해 core.pipeline<->services.gemini_client 순환참조를 피함)
 from config.gemini_config import build_response_config
-from config.prompts import PIPELINE_STEPS
+from config.prompts import ORIGINAL_PATTERN_LABEL, PIPELINE_STEPS
 from handlers.image_handler import ImageHandler
 from services.gemini_client import GeminiClient
 
@@ -41,8 +41,6 @@ OUT_DIR = SRC_DIR / "v3"
 STEP3_PROMPT = STEP3["prompt"]
 MAX_WORKERS = 6
 
-# 이미지 앞에 붙는 라벨. 프롬프트의 input 블록이 이 이름으로 이미지를 지목합니다.
-ORIGINAL_LABEL = "원본 컬러 패턴"
 
 
 def find_color_patterns(folder: Path) -> list[Path]:
@@ -71,7 +69,7 @@ def convert_one(color_path: Path, output_dir: Path = OUT_DIR) -> Path | None:
     image = ImageHandler.load(color_path)
 
     label = ImageHandler.LABEL_FORMAT.format
-    parts = [label(label=ORIGINAL_LABEL), image, STEP3_PROMPT]
+    parts = [label(label=ORIGINAL_PATTERN_LABEL), image, STEP3_PROMPT]
 
     client = GeminiClient()
     client.start_chat()

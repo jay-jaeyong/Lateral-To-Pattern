@@ -363,6 +363,7 @@ class Pipeline:
                     view_images=view_images,
                     reference_images=self._references_for(reference_views or []),
                     include_prev_texts=config.get("include_prev_texts", True),
+                    prev_image_label=config.get("prev_image_label"),
                 )
             except Exception:
                 logger.exception("parts 조립 실패 — 프롬프트만으로 진행합니다.")

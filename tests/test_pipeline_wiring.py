@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 from PIL import Image
 
 import core.pipeline as pipeline_module
-from config.prompts import PIPELINE_STEPS
+from config.prompts import ORIGINAL_PATTERN_LABEL, PIPELINE_STEPS
 from core.pipeline import Pipeline
 from core.models import StepResponse
 from utils.cli import VIEW_FLAGS
@@ -29,6 +29,8 @@ class PipelineWiringTest(unittest.TestCase):
         # 테스트용 이미지 생성
         self.shoe_img = make_test_image(self.tmp / "shoe.png")
         self.guide_img = make_test_image(self.tmp / "guide.png")
+        # Step 2가 만들어 넘기는 컬러 패턴 자리 (경로가 아니라 로드된 이미지)
+        self.color_pattern = Image.new("RGB", (4, 4), (200, 30, 30))
 
     def test_step1_receives_text_config(self):
         """Step 1이 TEXT 응답 modality config를 받는지 확인합니다."""
@@ -359,6 +361,41 @@ class PipelineWiringTest(unittest.TestCase):
             self.assertIn("turn:Step 1 output", saved_history)
             self.assertIn("turn:Step 2 output", saved_history)
             self.assertIn("turn:Step 3 output", saved_history)
+
+    def test_step3_receives_the_previous_color_pattern_with_a_label(self):
+        """Step 3는 앞 단계가 만든 컬러 패턴을 라벨과 함께 받아야 합니다.
+
+        라벨 없이 이미지만 들어가면 모델이 프롬프트가 말하는 '원본'을
+        지목하지 못하고 참고 사진 하나로 흘려봅니다. prev_image_label을
+        떼면 parts가 [이미지, 프롬프트]가 되어 이 테스트가 실패합니다."""
+        raw = MagicMock()
+        step = {
+            "step": 3,
+            "name": "line_art_conversion",
+            "description": "sketch",
+            "prompt": "prompt",
+            "image_path": None,
+            "prev_image_label": "원본 컬러 패턴",
+            "save_output": False,
+        }
+
+        with patch("core.pipeline.GeminiClient") as MockClient:
+            MockClient.return_value.send.return_value = StepResponse(images=[raw])
+            Pipeline(steps=[step], output_dir=self.tmp)._run_step(
+                step, previous_images=[self.color_pattern]
+            )
+
+        parts = MockClient.return_value.send.call_args.args[0]
+        self.assertEqual(parts[0], "[원본 컬러 패턴]")
+        self.assertIs(parts[1], self.color_pattern)
+        self.assertEqual(parts[-1], "prompt")
+
+    def test_step3_is_enabled_in_the_shipped_pipeline(self):
+        """Step 3는 main.py 실행으로 도달해야 합니다. enabled=False로 다시
+        꺼면 Pipeline이 실행 목록에서 빼버려 스케치 변환이 일어나지 않습니다."""
+        step3 = PIPELINE_STEPS[2]
+        self.assertTrue(step3.get("enabled", True))
+        self.assertEqual(step3["prev_image_label"], ORIGINAL_PATTERN_LABEL)
 
     def test_step3_passes_input_aspect_config_to_client(self):
         raw = MagicMock()

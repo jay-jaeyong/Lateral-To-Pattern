@@ -20,13 +20,15 @@ Pipeline Step Prompts
         - response_schema    : 응답을 특정 Pydantic 스키마로 검증 (예: Survey)
         - view_images        : (라벨, 경로) 목록. CLI 뷰 플래그가 런타임에 주입합니다
         - include_prev_texts : False면 이전 단계 텍스트(명세서 등)를 이 스텝의 parts에 넣지 않음 (기본 True)
+        - prev_image_label   : 앞 단계에서 생성된 이미지에 붙일 라벨. 없으면 라벨 없이 들어감
         - fresh_session      : True면 이 스텝 실행 직전에 채팅 세션을 새로 시작해 이전 단계
                                 텍스트가 채팅 히스토리로 전달되는 경로를 끊음 (기본 False)
 
 API에 전달되는 순서:
     Step 1  [라벨, 신발 사진, 라벨, 신발 사진, ..., 프롬프트]        → 텍스트 명세서
     Step 2  [가이드라인, 앞 단계 명세서, 프롬프트]                   → 펼친 패턴 이미지
-    Step 3  [앞 단계 생성 이미지, 프롬프트] (명세서 미포함)           → 스케치 패턴 이미지
+    Step 3  [원본 컬러 패턴 라벨, 앞 단계 생성 이미지, 프롬프트]      → 스케치 패턴 이미지
+            (명세서 미포함)
 """
 
 from pathlib import Path
@@ -99,6 +101,10 @@ GUIDELINE_BASE = Path("guides/가이드라인_회전5도_여백표시.png")
 # 규칙을 여러 블록에 걸쳐 길게 서술했던 직전 재단선 추출 판본은 제거했습니다.
 # 되살릴 일이 생기면 커밋 이력에서 LINE_ART_PROMPT_PREV를 찾으면 됩니다.
 # ─────────────────────────────────────────────────────────────────────────────
+# 앞 단계에서 만든 컬러 패턴에 붙는 라벨. Step 3 입력이 무엇인지 지목합니다.
+# scripts/run_step3_on_color_patterns.py도 같은 라벨을 씁니다.
+ORIGINAL_PATTERN_LABEL = "원본 컬러 패턴"
+
 # 현재 Step 3가 쓰는 판본. 사용자가 준 문장을 한 글자도 고치지 않고 그대로 씁니다.
 LINE_ART_PROMPT = """{
             "persona": "정밀 복제 전문가",
@@ -504,12 +510,12 @@ PIPELINE_STEPS: list[dict] = [
         "name": "line_art_conversion",
         "description": "스케치 패턴 변환 - 컬러 패턴 → 재단선만 남긴 스케치 패턴",
         "prompt": LINE_ART_PROMPT,
-        # 앞 단계에서 생성된 패턴 이미지가 자동으로 입력에 포함됩니다.
+        # 앞 단계에서 생성된 컬러 패턴이 입력에 들어갑니다. 라벨을 붙여야
+        # 모델이 이 이미지를 프롬프트가 말하는 '원본'으로 읽습니다. 라벨 없이
+        # 넣으면 그냥 참고 사진 한 장으로 흘려봅니다.
         "image_path": None,
+        "prev_image_label": ORIGINAL_PATTERN_LABEL,
         "save_output": True,
-        # 지금은 Step 2(펼치기)의 정확도만 보고 있어서 꺼둡니다.
-        # 이 스텝은 404 NOT_FOUND로도 자주 실패했습니다. 다시 켜려면 True로.
-        "enabled": False,
         # Step 1 명세서는 측면 사진 기준 3D 서술이라, 이걸 Step 3 입력에 넣으면
         # 모델이 평면 패턴을 트레이싱하는 대신 3D 신발을 다시 그려버립니다.
         # 5개 모델 × 2회 통제 실험으로 확인해서 껐습니다.

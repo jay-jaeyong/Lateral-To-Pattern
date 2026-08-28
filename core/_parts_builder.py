@@ -38,6 +38,7 @@ def build_step_parts(
     view_images: list[tuple[str, Path]] | None = None,
     reference_images: list[tuple[str, object]] | None = None,
     include_prev_texts: bool = True,
+    prev_image_label: str | None = None,
 ) -> list:
     """각 단계별 parts 리스트를 조립하여 반환합니다.
 
@@ -53,6 +54,7 @@ def build_step_parts(
         view_images     : (라벨, 경로) 목록. 주어지면 image_path 대신 이것을 쓴다
         reference_images: (라벨, 이미 로드된 이미지) 목록. parts 맨 앞에 붙는다
         include_prev_texts: False면 이전 단계 텍스트(명세서 등)를 넣지 않는다
+        prev_image_label: 이전 단계 생성 이미지에 붙일 라벨 (None이면 라벨 없이 넣는다)
     """
     # ── 1. 현재 단계의 주 입력 이미지 + 프롬프트 로드 ──────────────────
     if prebuilt_parts is not None:
@@ -67,7 +69,7 @@ def build_step_parts(
     parts = _insert_guide_images(parts, guide_image_path)
 
     # ── 3. 이전 생성 이미지를 parts 앞에 추가 ──────────────────────────
-    parts = _prepend_prev_images(parts, prev_images)
+    parts = _prepend_prev_images(parts, prev_images, prev_image_label)
 
     # ── 3-1. 앞 단계에서 쓴 실물 사진을 다시 맨 앞에 붙인다 ────────────
     parts = _prepend_reference_images(parts, reference_images)
@@ -153,13 +155,25 @@ def _prepend_reference_images(parts: list, references: list | None) -> list:
     return [*prefixed, *parts]
 
 
-def _prepend_prev_images(parts: list, prev_imgs: list) -> list:
-    """이전 생성 이미지를 parts 앞에 추가합니다."""
+def _prepend_prev_images(parts: list, prev_imgs: list, label: str | None = None) -> list:
+    """이전 생성 이미지를 parts 앞에 추가합니다.
+
+    label이 있으면 이미지마다 앞에 라벨을 붙입니다. 라벨 없이 넣으면 모델이
+    이 이미지를 프롬프트가 지목하는 대상으로 읽지 못하고 참고 사진 하나로
+    흘려봅니다. Step 3의 컬러 패턴이 그런 경우입니다.
+    """
     if not prev_imgs:
         return parts
 
     logger.info("이전 단계 생성 이미지(%d개)를 현재 요청에 포함했습니다.", len(prev_imgs))
-    return [*prev_imgs, *parts]
+    if label is None:
+        return [*prev_imgs, *parts]
+
+    labelled: list = []
+    for image in prev_imgs:
+        labelled.append(ImageHandler.LABEL_FORMAT.format(label=label))
+        labelled.append(image)
+    return [*labelled, *parts]
 
 
 def _insert_prev_texts(parts: list, prev_texts: list[str]) -> list:
