@@ -3,7 +3,10 @@
 import re
 import unittest
 
-from config.prompts import PIPELINE_STEPS
+from config.prompts import (
+    LINE_ART_PROMPT,
+    PIPELINE_STEPS,
+)
 from utils.cli import VIEW_FLAGS
 
 
@@ -103,10 +106,6 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("하이라이트 위치를 그대로 옮기지 마", unfold)
         self.assertIn("같은 광택으로 그려", unfold)
 
-    def test_line_art_does_not_outline_highlights(self):
-        """광택 경계를 재단선으로 착각하면 없는 재단선이 생깁니다."""
-        self.assertIn("하이라이트 경계를 재단선으로 착각", PIPELINE_STEPS[2]["prompt"])
-
     def test_survey_splits_unconfirmed_into_two_kinds(self):
         """면 전체 미확인과 개별 특징 미확인을 구분해야 복원 판단이 됩니다."""
         survey = PIPELINE_STEPS[0]["prompt"]
@@ -161,20 +160,13 @@ class PromptContentTest(unittest.TestCase):
         self.assertIn("미확인", survey)
         self.assertIn('"coverage"', survey)
 
-    def test_line_art_does_not_reference_the_survey(self):
-        """Step 3는 이제 독립 채팅 세션(fresh_session)으로 돌아가 명세서가
-        존재하지 않습니다. survey_rule(명세서 대조 규칙)은 없어야 하고,
-        광택/하이라이트를 재단선으로 착각하지 말라는 규칙은 remove_rule로
-        옮겨져 남아 있어야 합니다. 이전 문구는 '실제 부품 경계와 재봉선에만
-        그어'라서 재봉선을 그리라고 지시하고 있었습니다."""
-        prompt = PIPELINE_STEPS[2]["prompt"]
-        self.assertNotIn('"survey_rule"', prompt)
-        self.assertNotIn("재봉선에만 그어", prompt)
-        self.assertIn(
-            "**광택 차이나 하이라이트 경계를 재단선으로 착각해서 선을 긋지 마. 선은 원단을 잘라내는 재단선에만 그어**",
-            prompt,
-        )
+    def test_line_art_runs_in_an_isolated_session(self):
+        """Step 3는 독립 채팅 세션(fresh_session)으로 돌아가 Step 1이 쌓은
+        명세서가 존재하지 않습니다. fresh_session이 참이어야 하고, 동시에
+        include_prev_texts로 이전 텍스트를 끼워 넣지도 않아야 이 격리가
+        실제로 성립합니다."""
         self.assertTrue(PIPELINE_STEPS[2].get("fresh_session"))
+        self.assertFalse(PIPELINE_STEPS[2].get("include_prev_texts"))
 
     def test_survey_records_left_right_presence_and_counts(self):
         """좌우 판정과 개수가 없으면 복원 단계가 몇 개를 그릴지 정하지 못합니다."""
@@ -458,195 +450,38 @@ class SideViewRuleTest(unittest.TestCase):
         self.assertIn("두 면의 모양이 같은지 다른지 함께 적어", survey)
 
 
-class SketchPatternContractTest(unittest.TestCase):
-    """Step 3는 컬러 패턴에서 재단선만 남긴 스케치 패턴을 만듭니다.
+class SketchPatternSoloInputTest(unittest.TestCase):
+    """Step 3는 이제 보조 이미지 경로를 완전히 걷어내고 원본 한 장만 받습니다.
 
-    이전 프롬프트는 메쉬·무늬·재봉선·글자까지 모두 그리라고 지시해서
-    도메인 규칙(docs/source_of_truth.md)과 정반대로 움직였습니다.
+    보조 이미지 판정(utils.aid_image)은 폐기된 실험입니다. 남은 입력이
+    하나뿐이라는 계약과 그 흔적이 전부 지워졌는지를 검사합니다.
     """
 
-    def sketch(self) -> str:
-        return PIPELINE_STEPS[2]["prompt"]
-
-    def test_keeps_every_rule_block(self):
-        """규칙 블록이 통째로 사라지면 유지·제거·좌표 보존 판정이 함께 없어집니다."""
-        expected = [
-            "priority", "input", "task", "geometry_rule",
-            "keep_rule", "remove_rule", "render_rule", "self_check",
-        ]
-        found = re.findall(r'"([a-z_]+)": \[', self.sketch())
-        self.assertEqual(found, expected)
-
-    def test_priority_block_comes_first(self):
-        """좌표 보존과 보수적 판정이 다른 규칙에 밀리면 선이 움직입니다."""
-        sketch = self.sketch()
-        self.assertEqual(re.findall(r'"([a-z_]+)": \[', sketch)[0], "priority")
-        for rank in ("1순위", "2순위", "3순위", "4순위", "5순위"):
-            self.assertIn(rank, sketch)
-
-    def test_matches_input_aspect_without_requesting_postprocessing(self):
+    def test_step3_has_only_one_prompt(self):
         step = PIPELINE_STEPS[2]
-        self.assertIs(step.get("match_input_aspect_ratio"), True)
-        self.assertNotIn("postprocess_sketch", step)
-        self.assertIs(step.get("enabled"), False)
-        self.assertIs(step.get("fresh_session"), True)
-        self.assertIs(step.get("include_prev_texts"), False)
+        self.assertIs(step["prompt"], LINE_ART_PROMPT)
+        self.assertNotIn("prompt_with_aid", step)
 
-    def test_preserves_normalized_geometry_not_exact_pixel_dimensions(self):
-        prompt = self.sketch()
-        for phrase in (
-            "입력과 같은 화면 비율",
-            "프레이밍",
-            "정규화 좌표",
-            "x/width",
-            "y/height",
-            "곡률",
-            "개별 부품을 이동하지 마",
-        ):
-            self.assertIn(phrase, prompt)
-        self.assertNotIn("입력과 동일한 해상도", prompt)
-        self.assertNotIn("같은 픽셀 위치", prompt)
+    def test_no_aid_wording_remains(self):
+        prompt = LINE_ART_PROMPT
+        for phrase in ("경계 탐색 보조", "aid_rule", "보조 이미지"):
+            self.assertNotIn(phrase, prompt, msg=phrase)
 
-    def test_forbids_reframing_and_beautifying_the_lines(self):
-        """모델이 선을 다시 래스터화하면서 예쁘게 고치면 좌표가 어긋납니다."""
-        sketch = self.sketch()
-        self.assertIn("확대·축소·크롭·회전·반전·재배치를 하지 마", sketch)
-        self.assertIn("직선화·대칭화·곡선 보정을 하지 마", sketch)
-        self.assertIn("곡률", sketch)
 
-    def test_does_not_complete_or_invent_lines(self):
-        """가려져 안 보이는 부분을 지어내면 원본에 없는 재단선이 생깁니다.
+class PreciseReplicaPromptTest(unittest.TestCase):
+    """Step 3가 지금 쓰는 판본(정밀 복제)의 계약.
 
-        이전 문구('끊어진 선을 잇거나 가려진 부분을 완성하지 마')는 관찰된
-        위상(닫힌 외곽, 접점)을 보존하라는 규칙과 부딪혀서 생성 잡티로 생긴
-        진짜 틈까지 보존하라고 읽혔습니다. 지금은 틈을 메우는 것과 실제로
-        가려진 구간을 추론하는 것을 구분합니다."""
-        sketch = self.sketch()
-        self.assertIn("생성 과정에서 생긴 틈이나 끊김은 남기지 마", sketch)
-        self.assertIn("원본에 없는 선을 새로 추가하지 마", sketch)
+    프롬프트 문장 자체는 사용자가 직접 고쳐 쓰는 자리이므로 계약이 아닙니다.
+    이 판본에 걸린 계약은 Step 3가 그 상수를 쓴다는 배선뿐입니다.
+    """
 
-    def test_keeps_punching_and_nosew_cut_lines(self):
-        """펀칭과 노쏘 재단선은 원단에서 잘라내는 선이라 남아야 합니다."""
-        sketch = self.sketch()
-        self.assertIn("펀칭 재단선", sketch)
-        self.assertIn("노쏘 재단선", sketch)
-        self.assertIn("별도 선 형식으로 구분하지 마", sketch)
-        self.assertIn("고체 패널에 독립된 닫힌 구멍", sketch)
-
-    def test_keeps_mounting_holes_and_cut_logo_parts_only_when_certain(self):
-        """하드웨어 아래 구멍과 재단된 로고 부품은 조건이 붙어야 남습니다."""
-        sketch = self.sketch()
-        self.assertIn("원단을 잘라낸 구멍이 직접 식별될 때", sketch)
-        self.assertIn("별도 원단에서 재단한 부품으로 명확히 식별되는", sketch)
-
-    def test_removes_everything_that_is_not_a_cut_line(self):
-        """재봉선·표면 조직·하드웨어·음영·재봉 마진은 재단선이 아닙니다."""
-        sketch = self.sketch()
-        self.assertIn("재봉선과 실 모양", sketch)
-        self.assertIn("재단선 가까이에 있거나 나란히 있어도 제거", sketch)
-        for surface in ("메쉬", "니트", "격자", "엠보싱"):
-            self.assertIn(surface, sketch, msg=surface)
-        self.assertIn("인쇄·자수", sketch)
-        self.assertIn("금속 아일릿", sketch)
-        self.assertIn("버클", sketch)
-        self.assertIn("재봉 마진", sketch)
-        self.assertIn("새로 추가하지도 마", sketch)
-
-    def test_drops_uncertain_and_hidden_lines(self):
-        """불확실하면 제거하는 보수 원칙이 거짓 재단선을 막습니다."""
-        sketch = self.sketch()
-        self.assertIn("불확실한 선은 제거", sketch)
-        self.assertIn("펀칭인지 메쉬인지 불분명하면 제거", sketch)
-        self.assertIn("가려져 보이지 않는 재단선", sketch)
-        self.assertIn("추론하거나 복원하지 마", sketch)
-
-    def test_renders_one_uniform_black_line_style_on_white(self):
-        """선 종류를 색·점선·굵기로 나누면 재단선이 아닌 정보가 들어옵니다."""
-        sketch = self.sketch()
-        self.assertIn("순백(#FFFFFF)", sketch)
-        self.assertIn("동일한 굵기와 색의 검은 실선", sketch)
-        self.assertIn("의미별 색상, 점선, 굵기 차이를 두지 마", sketch)
-        self.assertIn("한 장의 평면 이미지", sketch)
-
-    def test_self_check_covers_the_acceptance_rules(self):
-        """출력 직전 자체 점검이 없으면 위 규칙이 조용히 무시됩니다."""
-        sketch = self.sketch()
-        self.assertIn('"self_check"', sketch)
-        checks = sketch.split('"self_check"', 1)[1]
-        for item in ("화면 비율", "정규화 좌표", "곡률", "재봉선", "펀칭", "재봉 마진", "순백"):
-            self.assertIn(item, checks, msg=item)
-
-    def test_old_conflicting_instructions_are_gone(self):
-        """이 네 지시가 스케치 패턴 규칙과 정면으로 부딪혔습니다."""
-        sketch = self.sketch()
-        self.assertNotIn("표면의 무늬까지 하나도 빠짐없이", sketch)
-        self.assertNotIn("표면의 모든 무늬를 개수와 위치까지", sketch)
-        self.assertNotIn("실물과 똑같은 위치에 따로 그려", sketch)
-        self.assertNotIn("글자와 실 모양까지 실물과 똑같이", sketch)
-        self.assertNotIn("정밀 복제 전문가", sketch)
-        self.assertNotIn('"detail_rule"', sketch)
-
-    def test_step_three_stays_isolated_and_disabled(self):
-        """명세서 격리와 비활성 상태는 이번 변경 범위가 아닙니다."""
-        sketch_step = PIPELINE_STEPS[2]
-        self.assertIs(sketch_step["include_prev_texts"], False)
-        self.assertIs(sketch_step["fresh_session"], True)
-        self.assertIs(sketch_step["enabled"], False)
-
-    def test_unfold_and_sketch_share_the_global_image_config(self):
-        """스텝별 이미지 설정이 갈리면 두 결과물의 크기가 어긋납니다."""
-        for index in (1, 2):
-            self.assertNotIn("image_config", PIPELINE_STEPS[index],
-                             msg=PIPELINE_STEPS[index]["name"])
-        from config.gemini_config import IMAGE_CONFIG
-
-        self.assertEqual(IMAGE_CONFIG.image_size, "4K")
-        self.assertEqual(IMAGE_CONFIG.aspect_ratio, "2:3")
-
-    def test_preserves_observed_cut_line_topology(self):
-        sketch = self.sketch()
-        self.assertIn("전체 외곽 재단선은 완전히 닫힌", sketch)
-        self.assertIn("내부 재단선은 닫힌 루프", sketch)
-        self.assertIn("다른 식별된 재단선에 정확히 닿아", sketch)
-        self.assertIn("생성 과정에서 생긴 틈", sketch)
-        self.assertNotIn("끊어진 선을 잇거나 가려진 부분을 완성하지 마", sketch)
-
-    def test_keeps_mesh_part_boundaries_but_removes_mesh_texture(self):
-        sketch = self.sketch()
-        self.assertIn("메시 패턴 파트의 재단선", sketch)
-        self.assertIn("다른 패턴 파트와 맞닿는지와 관계없이", sketch)
-        self.assertIn("메시 조직의 반복 무늬만 제거", sketch)
-        self.assertIn("발목", sketch)
-
-    def test_requires_closed_mesh_part_perimeters(self):
-        prompt = self.sketch()
-        for phrase in (
-            "메시 패턴 파트의 둘레",
-            "닫힌 순환 경계",
-            "정확한 접점",
-            "공유 구간",
-            "평행한 중복선",
-            "메시 조직만 제거",
-        ):
-            self.assertIn(phrase, prompt)
-
-    def test_keeps_circular_and_elliptical_punching(self):
-        sketch = self.sketch()
-        self.assertIn("원형 또는 타원형", sketch)
-        self.assertIn("닫힌 펀칭 재단선", sketch)
-
-    def test_forbids_every_color_fill_and_faint_cut_lines(self):
-        sketch = self.sketch()
-        self.assertIn("검정·회색·유채색 채움", sketch)
-        self.assertIn("순백(#FFFFFF)", sketch)
-        self.assertIn("순검정(#000000)", sketch)
-        self.assertIn("흐릿", sketch)
-
-    def test_rendering_allows_only_edge_antialias_gray(self):
-        prompt = self.sketch()
-        self.assertIn("순백", prompt)
-        self.assertIn("순검정", prompt)
-        self.assertIn("검은 선 가장자리", prompt)
-        self.assertIn("중립 회색 안티앨리어싱", prompt)
-        for forbidden in ("유채색 픽셀", "회색 채움", "음영", "재질 표현"):
-            self.assertIn(forbidden, prompt)
+    def test_step_three_uses_the_precise_replica_prompt(self):
+        """프롬프트 문장은 사용자가 직접 손보는 자리라 전문을 복사해두지
+        않습니다. 검사하는 것은 Step 3가 그 상수에 연결돼 있다는 배선과,
+        정밀 복제 판본의 블록 구성(persona/task/caution)뿐입니다."""
+        self.assertIs(PIPELINE_STEPS[2]["prompt"], LINE_ART_PROMPT)
+        self.assertIn('"persona": "정밀 복제 전문가"', LINE_ART_PROMPT)
+        self.assertEqual(
+            re.findall(r'"([a-z_]+)":', LINE_ART_PROMPT),
+            ["persona", "task", "caution"],
+        )
