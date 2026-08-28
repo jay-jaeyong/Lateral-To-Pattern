@@ -13,7 +13,9 @@ from google.genai import types
 # 사용할 Gemini 모델
 # ─────────────────────────────────────────────
 # gemini-3-pro-image-preview: 이미지 생성/편집 지원 (Nano Banana Pro)
-MODEL_NAME = "gemini-3-pro-image"
+# gemini-3.1-flash-image: 이미지 모델 중 유일하게 thinking_level을 받습니다
+# (minimal 기본 / high). 아래 THINKING_CONFIG와 짝입니다.
+MODEL_NAME = "gemini-3.1-flash-image"
 
 # ─────────────────────────────────────────────
 # 응답 모달리티 (이미지만 요청)
@@ -60,11 +62,16 @@ SAFETY_SETTINGS = [
 # ─────────────────────────────────────────────
 # 채팅 세션 GenerateContentConfig
 # ─────────────────────────────────────────────
+# thinking_level은 gemini-3.1-flash-image에서만 받습니다. gemini-3-pro-image로
+# 되돌릴 때는 이 상수와 아래 두 군데의 thinking_config를 함께 지우세요.
+THINKING_CONFIG = types.ThinkingConfig(thinking_level="HIGH")
+
 CHAT_CONFIG = types.GenerateContentConfig(
     response_modalities=RESPONSE_MODALITIES,
     image_config=IMAGE_CONFIG,
     safety_settings=SAFETY_SETTINGS,
     temperature=0,
+    thinking_config=THINKING_CONFIG,
 )
 
 # ─────────────────────────────────────────────
@@ -91,6 +98,7 @@ def build_response_config(
         "response_modalities": list(modalities or RESPONSE_MODALITIES),
         "safety_settings": SAFETY_SETTINGS,
         "temperature": 0,
+        "thinking_config": THINKING_CONFIG,
     }
     if "IMAGE" in kwargs["response_modalities"]:
         kwargs["image_config"] = (
