@@ -1,0 +1,24 @@
+{
+  "config": null,
+  "parts": [
+    {
+      "kind": "text",
+      "len": 10,
+      "sha256": "11c4ba1b81d7f28359a6d7f16c7456add144464a3d24081efbb994350a24a13b"
+    },
+    {
+      "kind": "pil",
+      "mode": "RGB",
+      "sha256": "f40053ea2486a000f0839bbf0516110c3108802aaec104548ebdc9b070c658dd",
+      "size": [
+        10,
+        15
+      ]
+    },
+    {
+      "kind": "text",
+      "len": 483,
+      "sha256": "ceb0670d8804feba867ad10868ac4d76a4464b0ab3dd035a6a18ac55b7adffb0"
+    }
+  ]
+}

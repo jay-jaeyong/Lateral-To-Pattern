@@ -1,0 +1,57 @@
+{
+  "config": null,
+  "parts": [
+    {
+      "kind": "text",
+      "len": 17,
+      "sha256": "04c1224115195c0b37a059d48d268264697883041e6163823646bc3b5048384f"
+    },
+    {
+      "kind": "pil",
+      "mode": "RGB",
+      "sha256": "77133f431d5e12dd850002c0d3d4e0fecbe3a7a699d604dc8c5eae9976e1d260",
+      "size": [
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "text",
+      "len": 15,
+      "sha256": "6d38992362600f5b623a118705b6e3b26e5bbd3cd28ef93f81ab1f55c01b7629"
+    },
+    {
+      "kind": "pil",
+      "mode": "RGB",
+      "sha256": "939117346965516c75fb8bab84056735d728cab3379fedf7094d7e23577fb73b",
+      "size": [
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "text",
+      "len": 28,
+      "sha256": "6b1427cca39a6c4c8992d8f4026d64f70c7e52911b36613f6c0a337a8dfb642e"
+    },
+    {
+      "kind": "pil",
+      "mode": "RGB",
+      "sha256": "6ab3f9ca0b5c5ba51c36051df8088065358e383e7778ab8ceda3fd45b2ed0dda",
+      "size": [
+        8,
+        8
+      ]
+    },
+    {
+      "kind": "text",
+      "len": 40,
+      "sha256": "80efd4745c18f5918d4e8525516afbf9946748d1fbeb536da1e386b77f1b8fc0"
+    },
+    {
+      "kind": "text",
+      "len": 15216,
+      "sha256": "8e6b1d5ad423accab9c8101721f63a58dcabfa4cffe623d3f132b1e12db9e782"
+    }
+  ]
+}
