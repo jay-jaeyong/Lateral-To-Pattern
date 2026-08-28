@@ -1,0 +1,878 @@
+{
+  "schema_version": 1,
+  "diagnostic_only": true,
+  "provenance": {
+    "started_at": "2026-08-26T07:37:46Z",
+    "manifest_path": "annotations/sketch-scoring/dataset.json",
+    "manifest_sha256": "0f7efdcd6a184e6181a2ca02fb5275b0b8b33f417234295c101fe2da4631f71c",
+    "annotation_sha256": {},
+    "git_commit": null,
+    "harness_version": "1",
+    "config": {
+      "canvas_width": 512,
+      "canvas_height": 768,
+      "aspect_pass_relative_error": 0.02,
+      "aspect_warn_relative_error": 0.05,
+      "chroma_threshold": 18,
+      "chroma_pass_ratio": 0.0005,
+      "chroma_warn_ratio": 0.002,
+      "dark_threshold": 72,
+      "fill_half_width_px": 4.0,
+      "fill_pass_ratio": 0.0005,
+      "fill_warn_ratio": 0.002,
+      "faint_low": 80,
+      "faint_high": 220,
+      "faint_dark_core": 80,
+      "silhouette_min_confidence": 0.55,
+      "silhouette_lab_distance": 18.0,
+      "ink_max_value": 128,
+      "path_tolerance_px": 5
+    }
+  },
+  "items": {
+    "adidas_ORKETRO": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "clean",
+        "path": "images/output-5/adidas_ORKETRO_sketch.png",
+        "source_sha256": "7f2fc29d7e899ae9add026437392c966e0f26eabe14b598b6cc7409f2bb895d9",
+        "output_sha256": "c4c7c7197d3aa32213020fbe834e8da4267aa2bdd5be94b35021a9d3666e81d0",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": 0.006329113924050722,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.006329113924050722,
+              "expected_ratio": "2:3",
+              "expected": 0.6666666666666666,
+              "actual": 0.6708860759493671,
+              "width": 3392,
+              "height": 5056
+            }
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.9444444444444444,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.8953239534816163,
+              "intersection_pixels": 184922,
+              "union_pixels": 206542,
+              "source_area_ratio": 0.5018997192382812,
+              "output_area_ratio": 0.49364471435546875
+            }
+          },
+          "colored_pixels": {
+            "score": 0.0,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.0,
+              "colored_pixels": 0,
+              "total_pixels": 17149952,
+              "chroma_threshold": 18
+            }
+          },
+          "black_fill": {
+            "score": 0.013769251365834727,
+            "status": "fail",
+            "confidence": 1.0,
+            "reason": "선 굵기보다 넓은 검정 내부 비율 0.01377",
+            "details": {
+              "raw_score": 0.013769251365834727,
+              "deep_pixels": 236142,
+              "total_pixels": 17149952,
+              "fill_half_width_px": 4.0
+            }
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 1.0,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 2.7405324516360162e-06,
+              "faint_pixels": 47,
+              "candidate_pixels": 220461,
+              "total_pixels": 17149952
+            }
+          }
+        },
+        "annotations": []
+      }
+    },
+    "adidas_adistar_XLG_2": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "clean",
+        "path": "images/output-5/adidas_adistar_XLG_2_sketch.png",
+        "source_sha256": "682705a3d09295f9cf44c0af07491a53fea8cabe6a858319ac82a4360a5fc773",
+        "output_sha256": "df0a55d9e6bfd1ad0868ecef5b68cab3b165561da79eed12e723f99ae80835ec",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": 0.006329113924050722,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.006329113924050722,
+              "expected_ratio": "2:3",
+              "expected": 0.6666666666666666,
+              "actual": 0.6708860759493671,
+              "width": 3392,
+              "height": 5056
+            }
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.5,
+            "reason": "원단과 배경의 색차가 분리 기준보다 작음",
+            "details": {
+              "source_area_ratio": 0.2947249065186888
+            }
+          },
+          "colored_pixels": {
+            "score": 0.0,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.0,
+              "colored_pixels": 0,
+              "total_pixels": 17149952,
+              "chroma_threshold": 18
+            }
+          },
+          "black_fill": {
+            "score": 9.556878060066874e-05,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 9.556878060066874e-05,
+              "deep_pixels": 1639,
+              "total_pixels": 17149952,
+              "fill_half_width_px": 4.0
+            }
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 1.0,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 2.530619327680917e-05,
+              "faint_pixels": 434,
+              "candidate_pixels": 357134,
+              "total_pixels": 17149952
+            }
+          }
+        },
+        "annotations": []
+      }
+    },
+    "asics_GEL-STRATUS_MC": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "clean",
+        "path": "images/output-5/asics_GEL-STRATUS_MC_sketch.png",
+        "source_sha256": "c105373adcc7002c94ab6084bc5a649ca849624bad410046ddd2d18c91149211",
+        "output_sha256": "56beb64c813dd68da93b656cc9d8babc4a2c4c7d453578291529b17b5243821e",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": 0.006329113924050722,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.006329113924050722,
+              "expected_ratio": "2:3",
+              "expected": 0.6666666666666666,
+              "actual": 0.6708860759493671,
+              "width": 3392,
+              "height": 5056
+            }
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.6442708704206679,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.5499295848765354,
+              "intersection_pixels": 109728,
+              "union_pixels": 199531,
+              "source_area_ratio": 0.29725392659505206,
+              "output_area_ratio": 0.4892323811848958
+            }
+          },
+          "colored_pixels": {
+            "score": 0.0,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.0,
+              "colored_pixels": 0,
+              "total_pixels": 17149952,
+              "chroma_threshold": 18
+            }
+          },
+          "black_fill": {
+            "score": 0.0011791869738177693,
+            "status": "warn",
+            "confidence": 1.0,
+            "reason": "선 굵기보다 넓은 검정 내부 비율 0.00118",
+            "details": {
+              "raw_score": 0.0011791869738177693,
+              "deep_pixels": 20223,
+              "total_pixels": 17149952,
+              "fill_half_width_px": 4.0
+            }
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 1.0,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.0,
+              "faint_pixels": 0,
+              "candidate_pixels": 285129,
+              "total_pixels": 17149952
+            }
+          }
+        },
+        "annotations": []
+      }
+    },
+    "asics_GEL_SONOMA": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "clean",
+        "path": "images/output-5/asics_GEL_SONOMA_sketch.png",
+        "source_sha256": "b0035e4f9b4e5a8e4ed1fcbeaaa947968cb2654404b9496ee6a49d0f2c05b2c6",
+        "output_sha256": "c2c0d9cc75a88edd0d09b317e50f3d70112e8445acf4b5870f294b3d2d0f17a6",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": 0.006329113924050722,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.006329113924050722,
+              "expected_ratio": "2:3",
+              "expected": 0.6666666666666666,
+              "actual": 0.6708860759493671,
+              "width": 3392,
+              "height": 5056
+            }
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.9444444444444444,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.9909295955470162,
+              "intersection_pixels": 225380,
+              "union_pixels": 227443,
+              "source_area_ratio": 0.5731709798177084,
+              "output_area_ratio": 0.5784174601236979
+            }
+          },
+          "colored_pixels": {
+            "score": 0.0,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.0,
+              "colored_pixels": 0,
+              "total_pixels": 17149952,
+              "chroma_threshold": 18
+            }
+          },
+          "black_fill": {
+            "score": 0.0030606499656675424,
+            "status": "fail",
+            "confidence": 1.0,
+            "reason": "선 굵기보다 넓은 검정 내부 비율 0.00306",
+            "details": {
+              "raw_score": 0.0030606499656675424,
+              "deep_pixels": 52490,
+              "total_pixels": 17149952,
+              "fill_half_width_px": 4.0
+            }
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 1.0,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.0,
+              "faint_pixels": 0,
+              "candidate_pixels": 161735,
+              "total_pixels": 17149952
+            }
+          }
+        },
+        "annotations": []
+      }
+    },
+    "nike_p6000": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "clean",
+        "path": "images/output-5/nike_p6000_sketch.png",
+        "source_sha256": "d716ff43fcc2ae7669c52cc096aef5820befccee0de75a3da67aa9c841ec6565",
+        "output_sha256": "c4a224c19853ec7958667b60e86cab52484ae8bbecc016b01ed5b0eb0350b7db",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": 0.006329113924050722,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.006329113924050722,
+              "expected_ratio": "2:3",
+              "expected": 0.6666666666666666,
+              "actual": 0.6708860759493671,
+              "width": 3392,
+              "height": 5056
+            }
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.05392297108968103,
+            "reason": "원단과 배경의 색차가 분리 기준보다 작음",
+            "details": {
+              "source_area_ratio": 0.47132855687224706
+            }
+          },
+          "colored_pixels": {
+            "score": 0.0,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.0,
+              "colored_pixels": 0,
+              "total_pixels": 17149952,
+              "chroma_threshold": 18
+            }
+          },
+          "black_fill": {
+            "score": 0.002591494133627896,
+            "status": "fail",
+            "confidence": 1.0,
+            "reason": "선 굵기보다 넓은 검정 내부 비율 0.00259",
+            "details": {
+              "raw_score": 0.002591494133627896,
+              "deep_pixels": 44444,
+              "total_pixels": 17149952,
+              "fill_half_width_px": 4.0
+            }
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 1.0,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.0,
+              "faint_pixels": 0,
+              "candidate_pixels": 188835,
+              "total_pixels": 17149952
+            }
+          }
+        },
+        "annotations": []
+      }
+    },
+    "nike_shox_ride_2": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "clean",
+        "path": "images/output-5/nike_shox_ride_2_sketch.png",
+        "source_sha256": "64a1453558963adef7d6a2bac2c5bf0e994252ff6c1186e2d00fcd0fd82fc5de",
+        "output_sha256": "ca8d4985cd4ad436ec523b6537ce46288c81a858cfd478ff5c78c58cd719193e",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": 0.006329113924050722,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.006329113924050722,
+              "expected_ratio": "2:3",
+              "expected": 0.6666666666666666,
+              "actual": 0.6708860759493671,
+              "width": 3392,
+              "height": 5056
+            }
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.9214325812127855,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.9130870749815154,
+              "intersection_pixels": 180300,
+              "union_pixels": 197462,
+              "source_area_ratio": 0.4924367268880208,
+              "output_area_ratio": 0.46826171875
+            }
+          },
+          "colored_pixels": {
+            "score": 0.0,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.0,
+              "colored_pixels": 0,
+              "total_pixels": 17149952,
+              "chroma_threshold": 18
+            }
+          },
+          "black_fill": {
+            "score": 0.0015689839831621686,
+            "status": "warn",
+            "confidence": 1.0,
+            "reason": "선 굵기보다 넓은 검정 내부 비율 0.00157",
+            "details": {
+              "raw_score": 0.0015689839831621686,
+              "deep_pixels": 26908,
+              "total_pixels": 17149952,
+              "fill_half_width_px": 4.0
+            }
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 1.0,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 2.3323680439455458e-07,
+              "faint_pixels": 4,
+              "candidate_pixels": 183427,
+              "total_pixels": 17149952
+            }
+          }
+        },
+        "annotations": []
+      }
+    },
+    "푸마2": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "annotated_only",
+        "path": "images/output-5/푸마2_sketch.jpeg",
+        "source_sha256": "97f516fb13f23ec23033ff50bc17d89021077edefe45019b2b9b4e6d28d857b3",
+        "output_sha256": "04ec8e2478e3880a7686af6f1c0dc6aee1fcb1c9d776ec2f0aeffc9a262ddef4",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.0,
+            "reason": "빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음",
+            "details": {}
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.0,
+            "reason": "빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음",
+            "details": {}
+          },
+          "colored_pixels": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.0,
+            "reason": "빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음",
+            "details": {}
+          },
+          "black_fill": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.0,
+            "reason": "빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음",
+            "details": {}
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.0,
+            "reason": "빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음",
+            "details": {}
+          }
+        },
+        "annotations": []
+      }
+    },
+    "푸마3": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "clean",
+        "path": "images/output-5/푸마3_sketch.png",
+        "source_sha256": "02104340973528549ad2b7e77391289a4669ff80f06f2ead8b88c415b45aafbf",
+        "output_sha256": "c2e7309816eb4a7e1ee60102c759b38a0c16b4f96ae7f2542b7e046a4fff1ada",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": 0.006329113924050722,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.006329113924050722,
+              "expected_ratio": "2:3",
+              "expected": 0.6666666666666666,
+              "actual": 0.6708860759493671,
+              "width": 3392,
+              "height": 5056
+            }
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.8888888888888888,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.7969549162649374,
+              "intersection_pixels": 168128,
+              "union_pixels": 210963,
+              "source_area_ratio": 0.43881479899088544,
+              "output_area_ratio": 0.5252634684244791
+            }
+          },
+          "colored_pixels": {
+            "score": 0.0,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.0,
+              "colored_pixels": 0,
+              "total_pixels": 17149952,
+              "chroma_threshold": 18
+            }
+          },
+          "black_fill": {
+            "score": 0.0057985585032541195,
+            "status": "fail",
+            "confidence": 1.0,
+            "reason": "선 굵기보다 넓은 검정 내부 비율 0.00580",
+            "details": {
+              "raw_score": 0.0057985585032541195,
+              "deep_pixels": 99445,
+              "total_pixels": 17149952,
+              "fill_half_width_px": 4.0
+            }
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 1.0,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 6.355702919751612e-06,
+              "faint_pixels": 109,
+              "candidate_pixels": 212127,
+              "total_pixels": 17149952
+            }
+          }
+        },
+        "annotations": []
+      }
+    },
+    "푸마5": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "clean",
+        "path": "images/output-5/푸마5_sketch.png",
+        "source_sha256": "97c21e4e821a571f0a044bac9a66ff337a4b2b68d7b03c9573ef243b8e246b80",
+        "output_sha256": "dd30444c8dfd8490317ece61cd5506547807e2d77ecf70993b63d0971b2c8ac9",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": 0.006329113924050722,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.006329113924050722,
+              "expected_ratio": "2:3",
+              "expected": 0.6666666666666666,
+              "actual": 0.6708860759493671,
+              "width": 3392,
+              "height": 5056
+            }
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.9444444444444444,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.8703137959991138,
+              "intersection_pixels": 168934,
+              "union_pixels": 194107,
+              "source_area_ratio": 0.4749501546223958,
+              "output_area_ratio": 0.44831085205078125
+            }
+          },
+          "colored_pixels": {
+            "score": 0.0,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.0,
+              "colored_pixels": 0,
+              "total_pixels": 17149952,
+              "chroma_threshold": 18
+            }
+          },
+          "black_fill": {
+            "score": 0.002630386370760688,
+            "status": "fail",
+            "confidence": 1.0,
+            "reason": "선 굵기보다 넓은 검정 내부 비율 0.00263",
+            "details": {
+              "raw_score": 0.002630386370760688,
+              "deep_pixels": 45111,
+              "total_pixels": 17149952,
+              "fill_half_width_px": 4.0
+            }
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 1.0,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.0,
+              "faint_pixels": 0,
+              "candidate_pixels": 266478,
+              "total_pixels": 17149952
+            }
+          }
+        },
+        "annotations": []
+      }
+    },
+    "필라1": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "annotated_only",
+        "path": "images/output-5/필라1_sketch.jpeg",
+        "source_sha256": "2a16341565d4a32d7cc5f2e8aa29535f937f56479034bc587a2433b04d2c21cb",
+        "output_sha256": "f8443d71eb810ce51de72c14de8f3cf178e804aec9dcdc1e690dd3f17db49bf2",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.0,
+            "reason": "빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음",
+            "details": {}
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.0,
+            "reason": "빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음",
+            "details": {}
+          },
+          "colored_pixels": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.0,
+            "reason": "빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음",
+            "details": {}
+          },
+          "black_fill": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.0,
+            "reason": "빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음",
+            "details": {}
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.0,
+            "reason": "빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음",
+            "details": {}
+          }
+        },
+        "annotations": []
+      }
+    },
+    "필라2": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "clean",
+        "path": "images/output-5/필라2_sketch.png",
+        "source_sha256": "1f9f6d652ad8a2e9d2d2f6798a58d7eb863c255b83083bd248ddbd3cb646bc06",
+        "output_sha256": "418600a39e4ebe87bdaed1f883de8b0b46f0a46a029bc4c180bb75e97febae37",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": 0.006329113924050722,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.006329113924050722,
+              "expected_ratio": "2:3",
+              "expected": 0.6666666666666666,
+              "actual": 0.6708860759493671,
+              "width": 3392,
+              "height": 5056
+            }
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.8888888888888888,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.877650762946424,
+              "intersection_pixels": 170596,
+              "union_pixels": 194378,
+              "source_area_ratio": 0.47592417399088544,
+              "output_area_ratio": 0.45225270589192706
+            }
+          },
+          "colored_pixels": {
+            "score": 0.0,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.0,
+              "colored_pixels": 0,
+              "total_pixels": 17149952,
+              "chroma_threshold": 18
+            }
+          },
+          "black_fill": {
+            "score": 0.00034519047050394076,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.00034519047050394076,
+              "deep_pixels": 5920,
+              "total_pixels": 17149952,
+              "fill_half_width_px": 4.0
+            }
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 1.0,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.0,
+              "faint_pixels": 0,
+              "candidate_pixels": 174448,
+              "total_pixels": 17149952
+            }
+          }
+        },
+        "annotations": []
+      }
+    },
+    "필라3": {
+      "output-5": {
+        "version": "output-5",
+        "kind": "clean",
+        "path": "images/output-5/필라3_sketch.png",
+        "source_sha256": "6533f1cff243145c1e5f30cf9326e1a10252ed4552b11b8835e4f35a0488abc3",
+        "output_sha256": "49e269580fefd191e5225c0db35668ff1dcbab962cc9566fe364addcddb1b93f",
+        "annotation_count": 0,
+        "metrics": {
+          "aspect_ratio": {
+            "score": 0.006329113924050722,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.006329113924050722,
+              "expected_ratio": "2:3",
+              "expected": 0.6666666666666666,
+              "actual": 0.6708860759493671,
+              "width": 3392,
+              "height": 5056
+            }
+          },
+          "silhouette_iou": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 0.45296626620822483,
+            "reason": "원단과 배경의 색차가 분리 기준보다 작음",
+            "details": {
+              "source_area_ratio": 0.40229540532178215
+            }
+          },
+          "colored_pixels": {
+            "score": 0.0,
+            "status": "pass",
+            "confidence": 1.0,
+            "reason": null,
+            "details": {
+              "raw_score": 0.0,
+              "colored_pixels": 0,
+              "total_pixels": 17149952,
+              "chroma_threshold": 18
+            }
+          },
+          "black_fill": {
+            "score": 0.01248668217846907,
+            "status": "fail",
+            "confidence": 1.0,
+            "reason": "선 굵기보다 넓은 검정 내부 비율 0.01249",
+            "details": {
+              "raw_score": 0.01248668217846907,
+              "deep_pixels": 214146,
+              "total_pixels": 17149952,
+              "fill_half_width_px": 4.0
+            }
+          },
+          "faint_strokes": {
+            "score": null,
+            "status": "not_scored",
+            "confidence": 1.0,
+            "reason": "정상 사례 기반 문턱 미확정",
+            "details": {
+              "raw_score": 0.0,
+              "faint_pixels": 0,
+              "candidate_pixels": 92706,
+              "total_pixels": 17149952
+            }
+          }
+        },
+        "annotations": []
+      }
+    }
+  }
+}

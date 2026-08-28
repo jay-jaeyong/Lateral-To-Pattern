@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "items": {
+    "adidas_ORKETRO": {
+      "display_name": "adidas_ORKETRO",
+      "source": "images/adidas_ORKETRO_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/adidas_ORKETRO_sketch.png",
+          "kind": "clean"
+        }
+      }
+    },
+    "adidas_adistar_XLG_2": {
+      "display_name": "adidas_adistar_XLG_2",
+      "source": "images/adidas_adistar_XLG_2_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/adidas_adistar_XLG_2_sketch.png",
+          "kind": "clean"
+        }
+      }
+    },
+    "asics_GEL-STRATUS_MC": {
+      "display_name": "asics_GEL-STRATUS_MC",
+      "source": "images/asics_GEL-STRATUS_MC_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/asics_GEL-STRATUS_MC_sketch.png",
+          "kind": "clean"
+        }
+      }
+    },
+    "asics_GEL_SONOMA": {
+      "display_name": "asics_GEL_SONOMA",
+      "source": "images/asics_GEL_SONOMA_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/asics_GEL_SONOMA_sketch.png",
+          "kind": "clean"
+        }
+      }
+    },
+    "nike_p6000": {
+      "display_name": "nike_p6000",
+      "source": "images/nike_p6000.jpeg",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/nike_p6000_sketch.png",
+          "kind": "clean"
+        }
+      }
+    },
+    "nike_shox_ride_2": {
+      "display_name": "nike_shox_ride_2",
+      "source": "images/nike_shox_ride_2_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/nike_shox_ride_2_sketch.png",
+          "kind": "clean"
+        }
+      }
+    },
+    "푸마2": {
+      "display_name": "푸마2",
+      "source": "images/푸마2_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/푸마2_sketch.jpeg",
+          "kind": "annotated_only"
+        }
+      }
+    },
+    "푸마3": {
+      "display_name": "푸마3",
+      "source": "images/푸마3_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/푸마3_sketch.png",
+          "kind": "clean"
+        }
+      }
+    },
+    "푸마5": {
+      "display_name": "푸마5",
+      "source": "images/푸마5_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/푸마5_sketch.png",
+          "kind": "clean"
+        }
+      }
+    },
+    "필라1": {
+      "display_name": "필라1",
+      "source": "images/필라1_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/필라1_sketch.jpeg",
+          "kind": "annotated_only"
+        }
+      }
+    },
+    "필라2": {
+      "display_name": "필라2",
+      "source": "images/필라2_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/필라2_sketch.png",
+          "kind": "clean"
+        }
+      }
+    },
+    "필라3": {
+      "display_name": "필라3",
+      "source": "images/필라3_color.png",
+      "expected_canvas_ratio": "2:3",
+      "needs_review": false,
+      "outputs": {
+        "output-5": {
+          "path": "images/output-5/필라3_sketch.png",
+          "kind": "clean"
+        }
+      }
+    }
+  }
+}
