@@ -24,7 +24,11 @@ class Step3BatchRunnerTest(unittest.TestCase):
         output = runner.sketch_output_path(source, Path("images/new_patterns/v3"))
         self.assertEqual(output, Path("images/new_patterns/v3/model_sketch.png"))
 
-    def test_convert_one_passes_input_aspect_config_and_saves_raw_image(self):
+    def test_convert_one_uses_fixed_2to3_default_image_config(self):
+        """Step 3는 더 이상 입력 화면비를 따라가지 않습니다. 이 스텝의
+        match_input_aspect_ratio가 꺼져 있으므로 build_response_config(None, ...)는
+        None을 돌려주고, per-call config가 None이면 GeminiClient.send는 채팅
+        세션 기본값(CHAT_CONFIG → IMAGE_CONFIG, 4K/2:3 고정)을 그대로 씁니다."""
         raw = Image.new("RGB", (20, 30), "blue")
         sent_configs = []
 
@@ -48,8 +52,8 @@ class Step3BatchRunnerTest(unittest.TestCase):
                 output = runner.convert_one(source, output_dir)
 
             self.assertEqual(output, output_dir / "model_sketch.png")
-            self.assertEqual(sent_configs[0].image_config.image_size, "4K")
-            self.assertIsNone(sent_configs[0].image_config.aspect_ratio)
+            self.assertIsNone(sent_configs[0])
+            self.assertIsNot(runner.STEP3.get("match_input_aspect_ratio", False), True)
             self.assertEqual(Image.open(output).getpixel((10, 15)), (0, 0, 255))
 
     def test_convert_one_does_not_regenerate_when_response_has_no_image(self):
@@ -79,6 +83,53 @@ class Step3BatchRunnerTest(unittest.TestCase):
             self.assertIsNone(output)
             self.assertEqual(client.send_calls, 1)
             self.assertFalse((output_dir / "model_sketch.png").exists())
+
+    def test_convert_one_sends_only_the_original_image_even_for_a_faint_input(self):
+        """이전에는 명도차가 작은(옅은) 입력에서 aid_image가 보조 이미지를 붙여
+        4개 파트(라벨×2, 이미지×2)를 보냈습니다. 그 경로를 완전히 걷어냈으므로,
+        이 조건에서도 항상 [라벨, 원본 이미지, STEP3_PROMPT] 3개 파트만 보내야
+        하고 *_aid 파일도 쓰지 않아야 합니다."""
+        raw = Image.new("RGB", (20, 30), "blue")
+        sent_parts: list = []
+
+        class FakeClient:
+            def start_chat(self):
+                pass
+
+            def send(self, parts, config=None):
+                from core.models import StepResponse
+
+                sent_parts.append(parts)
+                return StepResponse(images=[raw])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            source = folder / "model_color.png"
+            output_dir = folder / "v3"
+            # 배경과 명도차가 아주 작은(옅은) 부품 하나. 이전 aid_image 경로라면
+            # 이런 입력에서 보조 이미지를 붙였을 조건입니다.
+            faint = Image.new("RGB", (200, 200), "white")
+            for x in range(60, 140):
+                for y in range(60, 140):
+                    faint.putpixel((x, y), (250, 250, 250))
+            faint.save(source)
+
+            # ImageHandler.load가 돌려주는 객체를 원본 그대로(별도 복사나
+            # 파생 이미지 없이) 파츠에 담아 보내는지 확인합니다. 관련 없는
+            # 임의의 센티널 대신, 이 테스트가 구성한 실제 옅은(faint) 이미지
+            # 객체 자체를 load의 반환값으로 삼아 정체성을 검증합니다.
+            with patch.object(runner, "GeminiClient", return_value=FakeClient()), \
+                 patch.object(runner.ImageHandler, "load", return_value=faint):
+                runner.convert_one(source, output_dir)
+
+            parts = sent_parts[0]
+            self.assertEqual(len(parts), 3)
+            self.assertEqual(parts[0], "[원본 컬러 패턴]")
+            self.assertIs(parts[1], faint)
+            self.assertEqual(parts[2], runner.STEP3_PROMPT)
+
+            aid_files = list(output_dir.glob("*_aid*"))
+            self.assertEqual(aid_files, [])
 
     def test_convert_one_skips_when_output_already_exists(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -11,6 +11,9 @@ main.py 실행으로는 도달하지 않습니다. 이미 만들어둔 컬러 �
 
 사용법:
     uv run python scripts/run_step3_on_color_patterns.py
+    uv run python scripts/run_step3_on_color_patterns.py <입력폴더> <출력폴더>
+
+인자를 주지 않으면 images/new_patterns 를 읽어 images/new_patterns/v3 에 씁니다.
 """
 
 from __future__ import annotations
@@ -38,16 +41,23 @@ OUT_DIR = SRC_DIR / "v3"
 STEP3_PROMPT = STEP3["prompt"]
 MAX_WORKERS = 6
 
+# 이미지 앞에 붙는 라벨. 프롬프트의 input 블록이 이 이름으로 이미지를 지목합니다.
+ORIGINAL_LABEL = "원본 컬러 패턴"
+
 
 def find_color_patterns(folder: Path) -> list[Path]:
     files = ImageHandler.list_image_files(folder, exclude_guideline=True)
     return [f for f in files if "_color" in f.stem]
 
 
-def sketch_output_path(color_path: Path, output_dir: Path = OUT_DIR) -> Path:
+def _renamed(color_path: Path, suffix: str, output_dir: Path) -> Path:
     stem = color_path.stem
-    new_stem = stem.replace("_color", "_sketch") if "_color" in stem else f"{stem}_sketch"
+    new_stem = stem.replace("_color", suffix) if "_color" in stem else f"{stem}{suffix}"
     return output_dir / f"{new_stem}.png"
+
+
+def sketch_output_path(color_path: Path, output_dir: Path = OUT_DIR) -> Path:
+    return _renamed(color_path, "_sketch", output_dir)
 
 
 def convert_one(color_path: Path, output_dir: Path = OUT_DIR) -> Path | None:
@@ -59,10 +69,14 @@ def convert_one(color_path: Path, output_dir: Path = OUT_DIR) -> Path | None:
     logger.info("시작: %s → %s", color_path.name, out_path.name)
 
     image = ImageHandler.load(color_path)
+
+    label = ImageHandler.LABEL_FORMAT.format
+    parts = [label(label=ORIGINAL_LABEL), image, STEP3_PROMPT]
+
     client = GeminiClient()
     client.start_chat()
     response = client.send(
-        [image, STEP3_PROMPT],
+        parts,
         config=build_response_config(
             None,
             match_input_aspect_ratio=STEP3.get(
@@ -85,18 +99,21 @@ def main() -> None:
     logging.getLogger("google_genai").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    targets = find_color_patterns(SRC_DIR)
+    src_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else SRC_DIR
+    out_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else OUT_DIR
+
+    targets = find_color_patterns(src_dir)
     if not targets:
-        logger.error("%s 안에 '_color'가 포함된 이미지가 없습니다.", SRC_DIR)
+        logger.error("%s 안에 '_color'가 포함된 이미지가 없습니다.", src_dir)
         sys.exit(1)
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    logger.info("대상 %d개, 동시 실행 %d개", len(targets), MAX_WORKERS)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("%s → %s / 대상 %d개, 동시 실행 %d개", src_dir, out_dir, len(targets), MAX_WORKERS)
 
     succeeded: list[Path] = []
     failed: list[Path] = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        future_to_path = {pool.submit(convert_one, path, OUT_DIR): path for path in targets}
+        future_to_path = {pool.submit(convert_one, path, out_dir): path for path in targets}
         for future in as_completed(future_to_path):
             path = future_to_path[future]
             try:
