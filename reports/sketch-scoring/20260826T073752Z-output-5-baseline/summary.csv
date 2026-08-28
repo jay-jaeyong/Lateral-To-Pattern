@@ -1,6 +1,0 @@
-version,metric,median,improved,same,worsened,pass,warn,fail,not_scored,not_scored_reasons
-output-5,aspect_ratio,0.006329,0,0,0,10,0,0,2,빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음=2
-output-5,silhouette_iou,0.877651,0,0,0,0,0,0,12,빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음=2; 원단과 배경의 색차가 분리 기준보다 작음=3; 정상 사례 기반 문턱 미확정=7
-output-5,colored_pixels,0.000000,0,0,0,10,0,0,2,빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음=2
-output-5,black_fill,0.002611,0,0,0,2,2,6,2,빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음=2
-output-5,faint_strokes,0.000000,0,0,0,0,0,0,12,빨간 표시가 합성된 주석 자료이며 깨끗한 출력이 없음=2; 정상 사례 기반 문턱 미확정=10
