@@ -34,6 +34,7 @@ API에 전달되는 순서:
 from pathlib import Path
 from services.color_pattern.schema import Survey
 from services.color_pattern.prompts import PART_SURVEY_PROMPT, PATTERN_UNFOLD_PROMPT
+from services.sketch_pattern.prompts import LINE_ART_PROMPT, ORIGINAL_PATTERN_LABEL
 
 # 프로젝트 루트 기준 이미지 폴더
 #
@@ -90,38 +91,6 @@ SHOE_PHOTO_BASE = IMAGES_BASE
 # 좌우로 반전해 다시 붙이는 후처리를 거쳐 지금 판본을 만들었습니다.
 GUIDELINE_BASE = Path("guides/가이드라인_회전5도_여백표시.png")
 # GUIDELINE_BASE = Path("guides/가이드라인_비대칭_여백표시.png")  # 5도 회전 판본 이전
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 3 프롬프트
-#
-# 컬러 패턴 한 장을 받아 재단선만 남긴 스케치 패턴을 만듭니다. 입력은 항상
-# '원본 컬러 패턴' 한 장뿐입니다. 보조 이미지(경계 탐색용 흑백 가공본) 경로는
-# 폐기했습니다.
-#
-# 아래 문장은 실물 사진을 보고 선을 판별하게 맡기는 정밀 복제 판본입니다.
-# 규칙을 여러 블록에 걸쳐 길게 서술했던 직전 재단선 추출 판본은 제거했습니다.
-# 되살릴 일이 생기면 커밋 이력에서 LINE_ART_PROMPT_PREV를 찾으면 됩니다.
-# ─────────────────────────────────────────────────────────────────────────────
-# 앞 단계에서 만든 컬러 패턴에 붙는 라벨. Step 3 입력이 무엇인지 지목합니다.
-# scripts/run_step3_on_color_patterns.py도 같은 라벨을 씁니다.
-ORIGINAL_PATTERN_LABEL = "원본 컬러 패턴"
-
-# 현재 Step 3가 쓰는 판본. 사용자가 준 문장을 한 글자도 고치지 않고 그대로 씁니다.
-LINE_ART_PROMPT = """{
-            "persona": "정밀 복제 전문가",
-            "task":
-                [
-                    "원본 사진을 보고 정확하게 신발의 모든 선을 구분해서 라인 아트로 그리기",
-                    "색 채움 없이 윤곽 라인만 검은색(#000000)으로 그리기",
-                    "글자와 구멍, 실 모양까지 실물과 똑같이 그리기",
-                    "예외로 신발 메시와 무늬만 그리지마. 실은 무늬가 아니야. 실도 실물과 똑같이 그려."
-                ],
-            "caution":
-                [
-                    "모든 선을 정확하게 구분할 것",
-                    "실물과 똑같이 그릴 것"
-                ]
-            }"""
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 파이프라인 단계 정의

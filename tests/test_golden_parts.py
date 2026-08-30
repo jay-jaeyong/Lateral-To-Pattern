@@ -8,16 +8,14 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from PIL import Image
 
-import core.pipeline as pipeline_module
-from config.prompts import PIPELINE_STEPS
 from core.models import StepResponse
-from core.pipeline import Pipeline
 from services import engine
 from services.color_pattern import service as cp_service
+from services.sketch_pattern import service as sp_service
 from tests.golden_parts import (
     RecordingClient,
     assert_golden,
@@ -33,28 +31,6 @@ class GoldenPartsTest(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.tmp = Path(self._tmp.name)
         self.out = self.tmp / "out"
-
-    def _run_pipeline(self, color_pattern_image):
-        photos = make_fixture_photos(self.tmp / "photos")
-        guide = make_fixture_guide(self.tmp / "guides")
-
-        steps = [dict(s) for s in PIPELINE_STEPS]
-        steps[0]["image_path"] = None
-        steps[0]["view_images"] = photos
-        steps[1]["guide_image_path"] = guide
-
-        client = RecordingClient([
-            StepResponse(text='{"분석대상짝": "왼발", "부품목록": [], "표식목록": [], "미확인목록": []}', images=[]),
-            StepResponse(text="", images=[color_pattern_image]),
-            StepResponse(text="", images=[Image.new("RGB", (4, 4))]),
-        ])
-        with patch.object(pipeline_module, "GeminiClient", lambda *a, **k: client), \
-             patch.object(pipeline_module.OutputHandler, "save_step"), \
-             patch.object(pipeline_module.OutputHandler, "save_final"):
-            Pipeline(steps=steps, output_dir=self.out, run_label="golden").run(
-                skip_initial_selection=True
-            )
-        return client.calls
 
     def _run_color_pattern(self):
         shoe = self.tmp / "photos" / "shoe"
@@ -81,9 +57,12 @@ class GoldenPartsTest(unittest.TestCase):
         assert_golden(self, "color_pattern__step_2_pattern_unfold", calls[1])
 
     def test_golden_sketch_pattern_step_1(self):
-        color = Image.open(make_fixture_color_pattern(self.tmp / "patterns")).convert("RGB")
-        calls = self._run_pipeline(color)
-        assert_golden(self, "sketch_pattern__step_1_line_art", calls[2])
+        color = make_fixture_color_pattern(self.tmp / "patterns")
+        client = RecordingClient([engine.StepResponse(text="", images=[Image.new("RGB", (4, 4))])])
+        out = engine.RunOutput(self.tmp / "outputs", "golden")
+        with patch.object(sp_service.engine, "new_session", lambda model: client):
+            sp_service.run(color, out)
+        assert_golden(self, "sketch_pattern__step_1_line_art", client.calls[0])
 
 
 if __name__ == "__main__":
