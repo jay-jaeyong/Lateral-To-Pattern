@@ -3,7 +3,7 @@
 import unittest
 from pydantic import ValidationError
 
-from config.survey_schema import Survey, Part, Marking, Symmetry
+from services.color_pattern.schema import Survey, Part, Marking, Symmetry
 from config.gemini_config import IMAGE_CONFIG, build_response_config
 
 
