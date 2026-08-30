@@ -13,13 +13,15 @@ from services import engine
 class NewSessionTest(unittest.TestCase):
     def test_new_session_passes_the_given_model(self):
         """모델은 서비스가 정한다. 엔진이 고정 상수를 쓰면 안 된다."""
-        with patch.object(engine, "genai") as mock_genai:
+        with patch.object(engine, "genai") as mock_genai, \
+             patch.object(engine, "get_api_key", return_value="test-key"):
             engine.new_session("some-model")
         kwargs = mock_genai.Client.return_value.chats.create.call_args.kwargs
         self.assertEqual(kwargs["model"], "some-model")
 
     def test_send_retries_then_raises(self):
         with patch.object(engine, "genai") as mock_genai, \
+             patch.object(engine, "get_api_key", return_value="test-key"), \
              patch.object(engine.time, "sleep"):
             chat = mock_genai.Client.return_value.chats.create.return_value
             chat.send_message.side_effect = RuntimeError("boom")
