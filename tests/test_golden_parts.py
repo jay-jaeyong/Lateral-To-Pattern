@@ -16,6 +16,8 @@ import core.pipeline as pipeline_module
 from config.prompts import PIPELINE_STEPS
 from core.models import StepResponse
 from core.pipeline import Pipeline
+from services import engine
+from services.color_pattern import service as cp_service
 from tests.golden_parts import (
     RecordingClient,
     assert_golden,
@@ -54,12 +56,28 @@ class GoldenPartsTest(unittest.TestCase):
             )
         return client.calls
 
+    def _run_color_pattern(self):
+        shoe = self.tmp / "photos" / "shoe"
+        make_fixture_photos(shoe)
+        guide = make_fixture_guide(self.tmp / "guides")
+        client = RecordingClient([
+            StepResponse(
+                text='{"분석대상짝": "왼발", "부품목록": [], "표식목록": [], "미확인목록": []}',
+                images=[],
+            ),
+            StepResponse(text="", images=[Image.new("RGB", (10, 15))]),
+        ])
+        out = engine.RunOutput(self.tmp / "outputs", "golden")
+        with patch.object(cp_service.engine, "new_session", lambda model: client):
+            cp_service.run(shoe, guide, out)
+        return client.calls
+
     def test_golden_color_pattern_step_1(self):
-        calls = self._run_pipeline(Image.new("RGB", (10, 15), (200, 30, 30)))
+        calls = self._run_color_pattern()
         assert_golden(self, "color_pattern__step_1_part_survey", calls[0])
 
     def test_golden_color_pattern_step_2(self):
-        calls = self._run_pipeline(Image.new("RGB", (10, 15), (200, 30, 30)))
+        calls = self._run_color_pattern()
         assert_golden(self, "color_pattern__step_2_pattern_unfold", calls[1])
 
     def test_golden_sketch_pattern_step_1(self):
