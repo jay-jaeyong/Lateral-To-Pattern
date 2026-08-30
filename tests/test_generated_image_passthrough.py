@@ -9,8 +9,7 @@ import unittest
 
 from google.genai import types as genai_types
 
-from core.models import StepResponse
-from services.gemini_client import GeminiClient
+from services.engine import Session, StepResponse
 
 
 class FakeResponse:
@@ -26,10 +25,8 @@ class FakeChat:
         return FakeResponse()
 
 
-def make_client() -> GeminiClient:
-    client = GeminiClient.__new__(GeminiClient)  # __init__은 API 키를 요구합니다
-    client._chat = FakeChat()
-    return client
+def make_client() -> Session:
+    return Session(FakeChat())
 
 
 class GeneratedImagePassthroughTest(unittest.TestCase):

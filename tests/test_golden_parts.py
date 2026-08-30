@@ -12,8 +12,8 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from core.models import StepResponse
 from services import engine
+from services.engine import StepResponse
 from services.color_pattern import service as cp_service
 from services.sketch_pattern import service as sp_service
 from tests.golden_parts import (

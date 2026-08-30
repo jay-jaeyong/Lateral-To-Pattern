@@ -6,9 +6,9 @@
 # uv가 가상환경(.venv)과 의존성 설치를 알아서 처리합니다.
 #
 # 사용법:
-#   ./run.sh                 # 기본 실행 (콘솔에서 모델 폴더 선택)
-#   ./run.sh --verbose       # main.py 인자는 그대로 전달됩니다
-#   ./run.sh --run-label test
+#   ./run.sh --input inputs/photos/나이키_탄준
+#   ./run.sh --input inputs/photos/나이키_탄준 --verbose
+#   scripts/run_all.py 인자는 그대로 전달됩니다 (--out, --label, --repeat, --guide 등)
 #
 set -euo pipefail
 
@@ -61,36 +61,28 @@ if [ ! -s "config/APIkey" ] \
     exit 1
 fi
 
-# ── 3. 입력 이미지 확인 ───────────────────────────────────────────────────────
-# 이미지 경로를 인자로 직접 지정했다면 images/ 사전 검사를 건너뜁니다.
-skip_image_check=0
+# ── 3. 입력 확인 ─────────────────────────────────────────────────────────────
+# --input은 scripts/run_all.py의 필수 인자입니다. 여기서 먼저 안내합니다.
+has_input=0
 for arg in "$@"; do
     case "$arg" in
-        --lateral|--medial|--front|--heel|--top|--bottom|--shoe-image|--guide-image)
-            skip_image_check=1
+        --input|--input=*)
+            has_input=1
             break
             ;;
     esac
 done
 
-if [ "$skip_image_check" -eq 0 ]; then
-    shoe_dirs="$(find images -mindepth 1 -maxdepth 1 -type d 2>/dev/null || true)"
-    top_files="$(find images -maxdepth 1 -type f \
-        \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) \
-        2>/dev/null || true)"
+if [ "$has_input" -eq 0 ]; then
+    echo "[run.sh] --input이 필요합니다. 신발 사진 폴더를 지정하세요:"
+    echo "         ./run.sh --input inputs/photos/나이키_탄준"
+    exit 1
+fi
 
-    if [ -z "$shoe_dirs" ] && [ -z "$top_files" ]; then
-        echo "[run.sh] images/ 아래에 아무것도 없습니다. 다음처럼 넣어주세요:"
-        echo "         images/가이드라인.jpg            ← 펼칠 틀 (파일명에 '가이드라인' 포함)"
-        echo "         images/나이키_탄준/lateral.webp  ← 모델 폴더 안에 각도별 사진"
-        exit 1
-    fi
-
-    if ! printf '%s\n' "$top_files" | grep -qiE '가이드라인|가이드|guideline|guide'; then
-        echo "[run.sh] images/ 에서 가이드라인 이미지를 찾지 못했습니다."
-        echo "         파일명에 '가이드라인'(또는 guideline)이 들어간 이미지를 넣어주세요."
-        exit 1
-    fi
+if [ ! -f "inputs/guides/가이드라인_회전5도_여백표시.png" ]; then
+    echo "[run.sh] inputs/guides/ 아래에서 기본 가이드라인을 찾지 못했습니다."
+    echo "         --guide로 다른 경로를 지정하거나 파일을 그 자리에 넣어주세요."
+    exit 1
 fi
 
 # ── 4. 의존성 동기화 후 실행 ──────────────────────────────────────────────────
@@ -99,4 +91,4 @@ echo "[run.sh] 환경 준비 중..."
 uv sync --quiet
 
 echo "[run.sh] 파이프라인 실행"
-exec uv run python main.py "$@"
+exec uv run python scripts/run_all.py "$@"

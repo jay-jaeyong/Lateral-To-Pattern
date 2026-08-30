@@ -93,6 +93,11 @@ class RecordingClient:
     def chat_history(self):
         return self._history
 
+    @property
+    def history(self):
+        """engine.Session의 공개 인터페이스와 맞춘다 (archive.extend(session.history))."""
+        return self._history
+
     def _format_parts_for_log(self, parts):
         return ""
 

@@ -4,7 +4,7 @@ import unittest
 from pydantic import ValidationError
 
 from services.color_pattern.schema import Survey, Part, Marking, Symmetry
-from config.gemini_config import IMAGE_CONFIG, build_response_config
+from config.gemini import IMAGE_CONFIG, build_response_config
 
 
 class SymmetryValidationTest(unittest.TestCase):
@@ -231,27 +231,6 @@ class BuildResponseConfigWithSchemaTest(unittest.TestCase):
     def test_default_none_modalities_behavior_is_unchanged(self):
         self.assertIsNone(build_response_config(None))
         self.assertIsNone(build_response_config(None, response_schema=Survey))
-
-
-class PipelineWiringTest(unittest.TestCase):
-    """파이프라인 스텝 구성 검증."""
-
-    def test_step_1_has_response_schema(self):
-        """Step 1의 설정에 response_schema가 포함되어 있습니다."""
-        from config.prompts import PIPELINE_STEPS
-
-        step1 = PIPELINE_STEPS[0]
-        self.assertEqual(step1["name"], "part_survey")
-        self.assertIn("response_schema", step1)
-        self.assertIs(step1["response_schema"], Survey)
-
-    def test_step_2_does_not_have_response_schema(self):
-        """Step 2의 설정에는 response_schema가 없습니다."""
-        from config.prompts import PIPELINE_STEPS
-
-        step2 = PIPELINE_STEPS[1]
-        self.assertEqual(step2["name"], "pattern_unfold")
-        self.assertNotIn("response_schema", step2)
 
 
 if __name__ == "__main__":

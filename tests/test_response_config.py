@@ -2,9 +2,8 @@
 
 import unittest
 
-from config.gemini_config import IMAGE_CONFIG, build_response_config
-from core.models import StepResponse
-from services.gemini_client import GeminiClient
+from config.gemini import IMAGE_CONFIG, build_response_config
+from services.engine import Session, StepResponse
 
 
 class BuildResponseConfigTest(unittest.TestCase):
@@ -39,10 +38,8 @@ class FakeChat:
 
 
 class SendPassesConfigTest(unittest.TestCase):
-    def make_client(self) -> GeminiClient:
-        client = GeminiClient.__new__(GeminiClient)  # __init__은 API 키를 요구하므로 건너뜁니다
-        client._chat = FakeChat()
-        return client
+    def make_client(self) -> Session:
+        return Session(FakeChat())
 
     def test_config_is_forwarded(self):
         client = self.make_client()
@@ -64,6 +61,6 @@ if __name__ == "__main__":
 class AspectRatioTest(unittest.TestCase):
     def test_output_is_locked_to_portrait(self):
         """비율을 비워두면 모델이 가로를 골라 방향 규칙이 깨집니다."""
-        from config.gemini_config import IMAGE_CONFIG
+        from config.gemini import IMAGE_CONFIG
 
         self.assertEqual(IMAGE_CONFIG.aspect_ratio, "2:3")
