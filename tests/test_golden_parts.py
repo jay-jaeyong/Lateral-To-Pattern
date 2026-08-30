@@ -42,7 +42,7 @@ class GoldenPartsTest(unittest.TestCase):
         steps[1]["guide_image_path"] = guide
 
         client = RecordingClient([
-            StepResponse(text='{"분석대상짝": "왼발"}', images=[]),
+            StepResponse(text='{"분석대상짝": "왼발", "부품목록": [], "표식목록": [], "미확인목록": []}', images=[]),
             StepResponse(text="", images=[color_pattern_image]),
             StepResponse(text="", images=[Image.new("RGB", (4, 4))]),
         ])
