@@ -1,0 +1,191 @@
+"""스크립트 인자 처리 테스트. API는 호출하지 않는다."""
+
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from PIL import Image
+
+from scripts import _common, run_all, run_service
+
+
+class LabelTest(unittest.TestCase):
+    def test_repeat_one_has_no_suffix(self):
+        self.assertEqual(_common.run_labels("shoe_v7", 1), ["shoe_v7"])
+
+    def test_repeat_many_gets_numbered_suffixes(self):
+        self.assertEqual(
+            _common.run_labels("shoe_v7", 3),
+            ["shoe_v7-1", "shoe_v7-2", "shoe_v7-3"],
+        )
+
+    def test_derive_label_uses_the_folder_name_for_a_directory(self):
+        self.assertEqual(_common.derive_label(Path("inputs/photos/adidas_ORKETRO")),
+                         "adidas_ORKETRO")
+
+    def test_derive_label_uses_the_stem_for_a_file(self):
+        self.assertEqual(_common.derive_label(Path("inputs/color_patterns/a_color.png")),
+                         "a_color")
+
+
+class RunServiceTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.tmp = Path(self._tmp.name)
+        self.color = self.tmp / "a_color.png"
+        Image.new("RGB", (4, 4)).save(self.color)
+
+    def test_unknown_service_name_exits_nonzero(self):
+        with self.assertRaises(SystemExit):
+            run_service.main(["nope", "--input", str(self.color)])
+
+    def test_sketch_pattern_runs_once_per_repeat(self):
+        calls = []
+        with patch.object(run_service, "SERVICES", {
+            "sketch_pattern": type("M", (), {
+                "run": staticmethod(lambda path, out, archive=None: calls.append(out) or path)
+            })
+        }):
+            run_service.main([
+                "sketch_pattern", "--input", str(self.color),
+                "--out", str(self.tmp / "outputs"), "--repeat", "2",
+            ])
+        self.assertEqual(len(calls), 2)
+
+    def test_sketch_pattern_input_folder_runs_once_per_image_file(self):
+        """폴더를 넘기면 그 안의 이미지 파일마다 실행하고, 출력 레이블이
+        서로 덮어쓰지 않아야 한다."""
+        folder = self.tmp / "color_patterns"
+        folder.mkdir()
+        Image.new("RGB", (4, 4)).save(folder / "a_color.png")
+        Image.new("RGB", (4, 4)).save(folder / "b_color.png")
+
+        received_paths = []
+        received_labels = []
+        with patch.object(run_service, "SERVICES", {
+            "sketch_pattern": type("M", (), {
+                "run": staticmethod(lambda path, out, archive=None: (
+                    received_paths.append(path),
+                    received_labels.append(out.run_dir.name),
+                    path,
+                )[-1])
+            })
+        }):
+            run_service.main([
+                "sketch_pattern", "--input", str(folder),
+                "--out", str(self.tmp / "outputs"),
+            ])
+
+        self.assertEqual(len(received_paths), 2)
+        self.assertEqual(
+            {p.name for p in received_paths}, {"a_color.png", "b_color.png"},
+        )
+        self.assertEqual(len(set(received_labels)), 2, received_labels)
+
+    def test_sketch_pattern_input_folder_keeps_stem_label_when_no_collision(self):
+        """stem이 겹치지 않는 흔한 경우엔 레이블이 지금과 같아야 한다."""
+        folder = self.tmp / "color_patterns"
+        folder.mkdir()
+        Image.new("RGB", (4, 4)).save(folder / "a_color.png")
+
+        received_labels = []
+        with patch.object(run_service, "SERVICES", {
+            "sketch_pattern": type("M", (), {
+                "run": staticmethod(lambda path, out, archive=None: (
+                    received_labels.append(out.run_dir.name), path,
+                )[-1])
+            })
+        }):
+            run_service.main([
+                "sketch_pattern", "--input", str(folder),
+                "--out", str(self.tmp / "outputs"), "--label", "batch",
+            ])
+
+        self.assertEqual(received_labels, ["batch_a_color"])
+
+    def test_sketch_pattern_input_folder_disambiguates_same_stem_different_ext(self):
+        """같은 stem에 확장자만 다른 파일들이 서로 출력을 덮어쓰던 결함."""
+        folder = self.tmp / "color_patterns"
+        folder.mkdir()
+        Image.new("RGB", (4, 4)).save(folder / "same.png")
+        Image.new("RGB", (4, 4)).save(folder / "same.jpg")
+
+        received_paths = []
+        received_labels = []
+        with patch.object(run_service, "SERVICES", {
+            "sketch_pattern": type("M", (), {
+                "run": staticmethod(lambda path, out, archive=None: (
+                    received_paths.append(path),
+                    received_labels.append(out.run_dir.name),
+                    path,
+                )[-1])
+            })
+        }):
+            run_service.main([
+                "sketch_pattern", "--input", str(folder),
+                "--out", str(self.tmp / "outputs"), "--label", "batch",
+            ])
+
+        self.assertEqual(len(received_paths), 2)
+        self.assertEqual(len(set(received_labels)), 2, received_labels)
+
+
+    def test_sketch_pattern_input_folder_labels_are_unique_across_synthesis(self):
+        """확장자를 덧붙인 레이블이 다른 파일의 stem과 겹칠 수 있다.
+
+        same.png는 same.jpg와 겹쳐 batch_same_png가 되고, stem이 고유한
+        same_png.webp도 batch_same_png가 되어 뒤 실행이 앞 실행을 덮어썼다.
+        """
+        folder = self.tmp / "color_patterns"
+        folder.mkdir()
+        for name in ("same.png", "same.jpg", "same_png.webp"):
+            Image.new("RGB", (4, 4)).save(folder / name)
+
+        received_labels = []
+        with patch.object(run_service, "SERVICES", {
+            "sketch_pattern": type("M", (), {
+                "run": staticmethod(lambda path, out, archive=None: (
+                    received_labels.append(out.run_dir.name), path,
+                )[-1])
+            })
+        }):
+            run_service.main([
+                "sketch_pattern", "--input", str(folder),
+                "--out", str(self.tmp / "outputs"), "--label", "batch",
+            ])
+
+        self.assertEqual(len(received_labels), 3)
+        self.assertEqual(len(set(received_labels)), 3, received_labels)
+
+
+class RunAllTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.tmp = Path(self._tmp.name)
+        self.shoe = self.tmp / "shoe"
+        self.shoe.mkdir()
+        Image.new("RGB", (4, 4)).save(self.shoe / "lateral.png")
+
+    def test_color_pattern_output_path_is_handed_to_sketch_pattern(self):
+        """서비스 간 핸드오프는 파일이다."""
+        produced = self.tmp / "produced.png"
+        Image.new("RGB", (4, 4)).save(produced)
+        received = []
+
+        fake_cp = type("M", (), {"run": staticmethod(
+            lambda shoe_dir, guide, out, archive=None: produced)})
+        fake_sp = type("M", (), {"run": staticmethod(
+            lambda path, out, archive=None: received.append(path) or path)})
+
+        with patch.object(run_all, "color_pattern", fake_cp), \
+             patch.object(run_all, "sketch_pattern", fake_sp):
+            run_all.main(["--input", str(self.shoe), "--out", str(self.tmp / "outputs")])
+
+        self.assertEqual(received, [produced])
+
+
+if __name__ == "__main__":
+    unittest.main()

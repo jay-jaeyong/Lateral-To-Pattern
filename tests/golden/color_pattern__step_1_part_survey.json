@@ -1,0 +1,89 @@
+{
+  "config": {
+    "image_config": null,
+    "response_mime_type": "application/json",
+    "response_modalities": [
+      "TEXT"
+    ],
+    "response_schema": "Survey",
+    "temperature": 0.0,
+    "thinking_level": "HIGH"
+  },
+  "parts": [
+    {
+      "kind": "text",
+      "len": 17,
+      "sha256": "04c1224115195c0b37a059d48d268264697883041e6163823646bc3b5048384f"
+    },
+    {
+      "kind": "pil",
+      "mode": "RGB",
+      "sha256": "77133f431d5e12dd850002c0d3d4e0fecbe3a7a699d604dc8c5eae9976e1d260",
+      "size": [
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "text",
+      "len": 15,
+      "sha256": "6d38992362600f5b623a118705b6e3b26e5bbd3cd28ef93f81ab1f55c01b7629"
+    },
+    {
+      "kind": "pil",
+      "mode": "RGB",
+      "sha256": "939117346965516c75fb8bab84056735d728cab3379fedf7094d7e23577fb73b",
+      "size": [
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "text",
+      "len": 18,
+      "sha256": "06f1439b9fb6b8e5ed7b9b3f083b0a2788f1df9b5e8e5bb9338467164bfe2b44"
+    },
+    {
+      "kind": "pil",
+      "mode": "RGB",
+      "sha256": "997d98fa42a3a44e9e11453b920837826caad0e058ad93798fb781752c7f54ec",
+      "size": [
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "text",
+      "len": 17,
+      "sha256": "8c55d22900776b3adddab5478ca4105e8546aa90cf12bd46c8b24c1a25d2510f"
+    },
+    {
+      "kind": "pil",
+      "mode": "RGB",
+      "sha256": "3d626e11b4dfea872288c023275e6ed354cd836a0168987457a5777907265aca",
+      "size": [
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "text",
+      "len": 15,
+      "sha256": "138b13166259516587493ec8b072a9077cf2354bcd86e6ae82c65a29d7884b43"
+    },
+    {
+      "kind": "pil",
+      "mode": "RGB",
+      "sha256": "34ad20f34a0885d5ae90f4d65d7b2c51766c1c906d9193b55f73155be73b0543",
+      "size": [
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "text",
+      "len": 11777,
+      "sha256": "4cdebd4e5d869063c70037e115975f07a5994ee98d567a29eb2433b0988a222a"
+    }
+  ]
+}

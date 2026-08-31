@@ -1,0 +1,13 @@
+[project]
+name = "lateral-to-pattern"
+version = "0.1.0"
+description = "신발 실물 사이드뷰 사진을 2D 패턴으로 펼치는 Gemini 파이프라인"
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "Pillow>=10.0.0",
+]
+
+[tool.uv]
+package = false
