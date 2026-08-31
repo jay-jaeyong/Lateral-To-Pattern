@@ -25,16 +25,36 @@ REPEAT=${REPEAT:-1}
 LOG_DIR=outputs/_runlogs
 mkdir -p "$LOG_DIR"
 
+is_positive_int() {
+    case "$1" in
+        ''|*[!0-9]*) return 1 ;;
+        0) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
 services=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --jobs)
+            if [ $# -lt 2 ]; then
+                echo "--jobs 뒤에 값이 필요합니다." >&2
+                exit 1
+            fi
             JOBS="$2"
             shift 2
             ;;
         --repeat)
+            if [ $# -lt 2 ]; then
+                echo "--repeat 뒤에 값이 필요합니다." >&2
+                exit 1
+            fi
             REPEAT="$2"
             shift 2
+            ;;
+        --*)
+            echo "알 수 없는 옵션: $1" >&2
+            exit 1
             ;;
         *)
             services+=("$1")
@@ -42,6 +62,15 @@ while [ $# -gt 0 ]; do
             ;;
     esac
 done
+
+if ! is_positive_int "$JOBS"; then
+    echo "--jobs는 1 이상의 정수여야 합니다: $JOBS" >&2
+    exit 1
+fi
+if ! is_positive_int "$REPEAT"; then
+    echo "--repeat는 1 이상의 정수여야 합니다: $REPEAT" >&2
+    exit 1
+fi
 
 if [ ${#services[@]} -gt 0 ]; then
     for svc in "${services[@]}"; do

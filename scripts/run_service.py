@@ -19,6 +19,24 @@ from services import engine  # noqa: E402
 from services.utils import images  # noqa: E402
 
 
+def folder_source_labels(base: str, files: list[Path]) -> list[str]:
+    """폴더 안 파일마다 유일한 레이블을 만든다.
+
+    stem이 겹치지 않으면 기존과 같은 `{base}_{stem}` 형태를 쓴다. 같은 stem에
+    확장자만 다른 파일이 있으면(`same.png`, `same.jpg`) 확장자를 덧붙여
+    구분해서 서로 출력을 덮어쓰지 않게 한다.
+    """
+    stems = [f.stem for f in files]
+    dupe_stems = {s for s in stems if stems.count(s) > 1}
+    labels = []
+    for f in files:
+        if f.stem in dupe_stems:
+            labels.append(f"{base}_{f.stem}_{f.suffix.lstrip('.')}")
+        else:
+            labels.append(f"{base}_{f.stem}")
+    return labels
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="서비스 하나를 실행합니다.")
     parser.add_argument("service", choices=sorted(SERVICES))
@@ -45,17 +63,17 @@ def main(argv: list[str] | None = None) -> int:
     # 폴더면 안의 이미지 파일마다 한 번씩 돌린다. 파일 stem을 레이블에 넣지
     # 않으면 여러 장을 처리할 때 출력이 서로 덮어쓴다.
     if args.service == "sketch_pattern" and source.is_dir():
-        sources = [(f, f.stem) for f in images.list_image_files(source)]
-        if not sources:
+        files = images.list_image_files(source)
+        if not files:
             raise FileNotFoundError(
                 f"폴더에 지원하는 이미지 파일이 없습니다: {source}\n"
                 f"지원 형식: {', '.join(images.SUPPORTED_EXTENSIONS)}"
             )
+        sources = list(zip(files, folder_source_labels(base, files)))
     else:
-        sources = [(source, None)]
+        sources = [(source, base)]
 
-    for file_path, suffix in sources:
-        file_base = f"{base}_{suffix}" if suffix else base
+    for file_path, file_base in sources:
         for label in run_labels(file_base, args.repeat):
             out = engine.RunOutput(Path(args.out), label)
             archive = engine.HistoryArchive()

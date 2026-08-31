@@ -84,6 +84,53 @@ class RunServiceTest(unittest.TestCase):
         )
         self.assertEqual(len(set(received_labels)), 2, received_labels)
 
+    def test_sketch_pattern_input_folder_keeps_stem_label_when_no_collision(self):
+        """stem이 겹치지 않는 흔한 경우엔 레이블이 지금과 같아야 한다."""
+        folder = self.tmp / "color_patterns"
+        folder.mkdir()
+        Image.new("RGB", (4, 4)).save(folder / "a_color.png")
+
+        received_labels = []
+        with patch.object(run_service, "SERVICES", {
+            "sketch_pattern": type("M", (), {
+                "run": staticmethod(lambda path, out, archive=None: (
+                    received_labels.append(out.run_dir.name), path,
+                )[-1])
+            })
+        }):
+            run_service.main([
+                "sketch_pattern", "--input", str(folder),
+                "--out", str(self.tmp / "outputs"), "--label", "batch",
+            ])
+
+        self.assertEqual(received_labels, ["batch_a_color"])
+
+    def test_sketch_pattern_input_folder_disambiguates_same_stem_different_ext(self):
+        """같은 stem에 확장자만 다른 파일들이 서로 출력을 덮어쓰던 결함."""
+        folder = self.tmp / "color_patterns"
+        folder.mkdir()
+        Image.new("RGB", (4, 4)).save(folder / "same.png")
+        Image.new("RGB", (4, 4)).save(folder / "same.jpg")
+
+        received_paths = []
+        received_labels = []
+        with patch.object(run_service, "SERVICES", {
+            "sketch_pattern": type("M", (), {
+                "run": staticmethod(lambda path, out, archive=None: (
+                    received_paths.append(path),
+                    received_labels.append(out.run_dir.name),
+                    path,
+                )[-1])
+            })
+        }):
+            run_service.main([
+                "sketch_pattern", "--input", str(folder),
+                "--out", str(self.tmp / "outputs"), "--label", "batch",
+            ])
+
+        self.assertEqual(len(received_paths), 2)
+        self.assertEqual(len(set(received_labels)), 2, received_labels)
+
 
 class RunAllTest(unittest.TestCase):
     def setUp(self):

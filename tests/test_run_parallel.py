@@ -97,6 +97,63 @@ class RunParallelTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("반복 2회", result.stdout)
 
+    def test_jobs_zero_is_rejected_not_hung(self):
+        """--jobs 0은 대기 루프가 절대 참이 되어 무한 대기하던 결함.
+
+        검증 로직이 붙으면 작업을 하나도 시작하기 전에 바로 종료돼야 한다.
+        타임아웃에 걸리면(=무한 대기로 회귀) 실패로 처리한다.
+        """
+        try:
+            result = self._run(["--jobs", "0", "color_pattern"])
+        except subprocess.TimeoutExpired:
+            self.fail("--jobs 0이 무한 대기를 일으켰다 (회귀)")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.log_file.exists())
+
+    def test_jobs_env_var_zero_is_rejected_not_hung(self):
+        for name in ("shoeA",):
+            (self.repo / "inputs" / "photos" / name).mkdir(parents=True, exist_ok=True)
+        env = {
+            **os.environ,
+            "PY": str(self.stub),
+            "FAKE_LOG": str(self.log_file),
+            "JOBS": "0",
+        }
+        try:
+            result = subprocess.run(
+                ["bash", "scripts/run_parallel.sh"],
+                cwd=self.repo,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail("JOBS=0이 무한 대기를 일으켰다 (회귀)")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.log_file.exists())
+
+    def test_jobs_without_value_fails_cleanly(self):
+        """--jobs 뒤에 값이 없으면 unbound variable로 죽지 않고 사용법 오류로 끝나야 한다."""
+        result = self._run(["--jobs"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("unbound variable", result.stderr)
+
+    def test_repeat_without_value_fails_cleanly(self):
+        result = self._run(["--repeat"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("unbound variable", result.stderr)
+
+    def test_jobs_non_integer_is_rejected(self):
+        result = self._run(["--jobs", "abc", "color_pattern"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.log_file.exists())
+
+    def test_unknown_flag_is_rejected(self):
+        result = self._run(["--foo", "color_pattern"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.log_file.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
