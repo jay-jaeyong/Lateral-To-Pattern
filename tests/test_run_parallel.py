@@ -110,6 +110,38 @@ class RunParallelTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(self.log_file.exists())
 
+    def test_jobs_with_leading_zeros_is_rejected_not_hung(self):
+        """"00"은 숫자만으로 이뤄져 있어 정수 검증을 통과하지만,
+        [ n -ge 00 ] 비교에서는 0으로 평가돼 --jobs 0과 같은 무한 대기가 된다."""
+        try:
+            result = self._run(["--jobs", "00", "color_pattern"])
+        except subprocess.TimeoutExpired:
+            self.fail("--jobs 00이 무한 대기를 일으켰다 (회귀)")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.log_file.exists())
+
+    def test_jobs_env_var_with_leading_zeros_is_rejected_not_hung(self):
+        (self.repo / "inputs" / "photos" / "shoeA").mkdir(parents=True, exist_ok=True)
+        env = {
+            **os.environ,
+            "PY": str(self.stub),
+            "FAKE_LOG": str(self.log_file),
+            "JOBS": "000",
+        }
+        try:
+            result = subprocess.run(
+                ["bash", "scripts/run_parallel.sh"],
+                cwd=self.repo,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail("JOBS=000이 무한 대기를 일으켰다 (회귀)")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.log_file.exists())
+
     def test_jobs_env_var_zero_is_rejected_not_hung(self):
         for name in ("shoeA",):
             (self.repo / "inputs" / "photos" / name).mkdir(parents=True, exist_ok=True)

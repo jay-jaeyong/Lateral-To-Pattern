@@ -132,6 +132,34 @@ class RunServiceTest(unittest.TestCase):
         self.assertEqual(len(set(received_labels)), 2, received_labels)
 
 
+    def test_sketch_pattern_input_folder_labels_are_unique_across_synthesis(self):
+        """확장자를 덧붙인 레이블이 다른 파일의 stem과 겹칠 수 있다.
+
+        same.png는 same.jpg와 겹쳐 batch_same_png가 되고, stem이 고유한
+        same_png.webp도 batch_same_png가 되어 뒤 실행이 앞 실행을 덮어썼다.
+        """
+        folder = self.tmp / "color_patterns"
+        folder.mkdir()
+        for name in ("same.png", "same.jpg", "same_png.webp"):
+            Image.new("RGB", (4, 4)).save(folder / name)
+
+        received_labels = []
+        with patch.object(run_service, "SERVICES", {
+            "sketch_pattern": type("M", (), {
+                "run": staticmethod(lambda path, out, archive=None: (
+                    received_labels.append(out.run_dir.name), path,
+                )[-1])
+            })
+        }):
+            run_service.main([
+                "sketch_pattern", "--input", str(folder),
+                "--out", str(self.tmp / "outputs"), "--label", "batch",
+            ])
+
+        self.assertEqual(len(received_labels), 3)
+        self.assertEqual(len(set(received_labels)), 3, received_labels)
+
+
 class RunAllTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()

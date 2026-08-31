@@ -28,7 +28,9 @@ mkdir -p "$LOG_DIR"
 is_positive_int() {
     case "$1" in
         ''|*[!0-9]*) return 1 ;;
-        0) return 1 ;;
+        # 선행 0은 거부한다. "00"은 여기를 통과해도 [ n -ge 00 ] 비교에서
+        # 0으로 평가돼 동시 실행 수 0으로 무한 대기에 빠진다.
+        0*) return 1 ;;
         *) return 0 ;;
     esac
 }

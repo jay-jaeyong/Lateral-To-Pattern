@@ -28,12 +28,20 @@ def folder_source_labels(base: str, files: list[Path]) -> list[str]:
     """
     stems = [f.stem for f in files]
     dupe_stems = {s for s in stems if stems.count(s) > 1}
-    labels = []
+    labels: list[str] = []
     for f in files:
         if f.stem in dupe_stems:
-            labels.append(f"{base}_{f.stem}_{f.suffix.lstrip('.')}")
+            label = f"{base}_{f.stem}_{f.suffix.lstrip('.')}"
         else:
-            labels.append(f"{base}_{f.stem}")
+            label = f"{base}_{f.stem}"
+        # 확장자를 덧붙인 이름이 다른 파일의 stem과 겹칠 수 있다
+        # (same.png, same.jpg, same_png.webp). 최종 집합에서 한 번 더 푼다.
+        if label in labels:
+            suffix = 2
+            while f"{label}_{suffix}" in labels:
+                suffix += 1
+            label = f"{label}_{suffix}"
+        labels.append(label)
     return labels
 
 
