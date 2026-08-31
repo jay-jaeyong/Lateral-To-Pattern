@@ -15,6 +15,7 @@ from services.color_pattern import (
     step_2_pattern_unfold,
 )
 from services.color_pattern.prompts import PART_SURVEY_PROMPT, PATTERN_UNFOLD_PROMPT
+from services.utils import images
 
 # Step 1의 TEXT+JSON과 Step 2의 IMAGE를 한 세션에서 모두 처리해야 한다.
 # chats.create(model=...)가 세션 생성 시점에 모델을 고정하므로 두 스텝은
@@ -26,6 +27,10 @@ SERVICE = "color_pattern"
 
 def run(shoe_dir: Path, guide_path: Path, out, archive=None) -> Path:
     """저장된 컬러 패턴 PNG 경로를 반환한다."""
+    # Step 2에서야 처음 열리는 파일이라, 여기서 미리 확인하지 않으면
+    # 잘못된 경로가 Step 1의 유료 API 호출을 태운 뒤에야 걸린다.
+    images.load(guide_path)
+
     photos = photo_input.resolve(shoe_dir)
     session = engine.new_session(MODEL)
 
@@ -46,4 +51,10 @@ def run(shoe_dir: Path, guide_path: Path, out, archive=None) -> Path:
     if archive is not None:
         archive.extend(session.history)
 
-    return out.service_dir(SERVICE) / "step_2_pattern_unfold_generated_01.png"
+    image_path = out.service_dir(SERVICE) / "step_2_pattern_unfold_generated_01.png"
+    if not image_path.exists():
+        raise RuntimeError(
+            f"{SERVICE} step 2(pattern_unfold)가 이미지를 만들지 못했습니다: {image_path}\n"
+            f"Gemini가 안전 필터나 일시 오류로 이미지 없이 응답했을 수 있습니다."
+        )
+    return image_path

@@ -29,4 +29,10 @@ def run(color_pattern_path: Path, out, archive=None) -> Path:
     )
     if archive is not None:
         archive.extend(session.history)
-    return out.service_dir(SERVICE) / "step_1_line_art_generated_01.png"
+    image_path = out.service_dir(SERVICE) / "step_1_line_art_generated_01.png"
+    if not image_path.exists():
+        raise RuntimeError(
+            f"{SERVICE} step 1(line_art)이 이미지를 만들지 못했습니다: {image_path}\n"
+            f"Gemini가 안전 필터나 일시 오류로 이미지 없이 응답했을 수 있습니다."
+        )
+    return image_path

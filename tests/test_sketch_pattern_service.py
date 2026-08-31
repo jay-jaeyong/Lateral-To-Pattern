@@ -65,6 +65,17 @@ class SketchPatternTest(unittest.TestCase):
     def test_label_value_is_unchanged(self):
         self.assertEqual(prompts.ORIGINAL_PATTERN_LABEL, "원본 컬러 패턴")
 
+    def test_missing_generated_image_raises_instead_of_returning_a_ghost_path(self):
+        """Gemini가 안전 필터 등으로 이미지 없이 응답하면, 존재하지 않는
+        경로를 성공처럼 반환해선 안 된다."""
+        client = RecordingClient([
+            engine.StepResponse(text="", images=[]),
+        ])
+        out = engine.RunOutput(self.tmp / "outputs", "run_missing")
+        with patch.object(service.engine, "new_session", lambda model: client):
+            with self.assertRaises(RuntimeError):
+                service.run(self.color, out)
+
 
 if __name__ == "__main__":
     unittest.main()

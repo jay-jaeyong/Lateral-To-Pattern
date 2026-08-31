@@ -83,6 +83,33 @@ class ServiceTest(unittest.TestCase):
     def test_model_is_declared_by_the_service(self):
         self.assertEqual(service.MODEL, "gemini-3.1-flash-image")
 
+    def test_missing_generated_image_raises_instead_of_returning_a_ghost_path(self):
+        """Gemini가 안전 필터 등으로 이미지 없이 응답하면, 존재하지 않는
+        경로를 성공처럼 반환해선 안 된다."""
+        client = RecordingClient([
+            engine.StepResponse(text=VALID_SURVEY, images=[]),
+            engine.StepResponse(text="", images=[]),
+        ])
+        out = engine.RunOutput(self.tmp / "outputs", "run_missing")
+        with patch.object(service.engine, "new_session", lambda model: client):
+            with self.assertRaises(RuntimeError):
+                service.run(self.shoe, self.guide, out)
+
+    def test_bad_guide_path_fails_before_any_api_call(self):
+        """가이드 경로 검증은 Step 1의 유료 API 호출보다 먼저 일어나야 한다."""
+        calls = []
+
+        def fake_new_session(model):
+            calls.append(model)
+            raise AssertionError("guide 검증 전에 세션을 만들면 안 된다")
+
+        out = engine.RunOutput(self.tmp / "outputs", "run_bad_guide")
+        bad_guide = self.tmp / "no_such_guide.png"
+        with patch.object(service.engine, "new_session", fake_new_session):
+            with self.assertRaises(FileNotFoundError):
+                service.run(self.shoe, bad_guide, out)
+        self.assertEqual(calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -54,6 +54,36 @@ class RunServiceTest(unittest.TestCase):
             ])
         self.assertEqual(len(calls), 2)
 
+    def test_sketch_pattern_input_folder_runs_once_per_image_file(self):
+        """폴더를 넘기면 그 안의 이미지 파일마다 실행하고, 출력 레이블이
+        서로 덮어쓰지 않아야 한다."""
+        folder = self.tmp / "color_patterns"
+        folder.mkdir()
+        Image.new("RGB", (4, 4)).save(folder / "a_color.png")
+        Image.new("RGB", (4, 4)).save(folder / "b_color.png")
+
+        received_paths = []
+        received_labels = []
+        with patch.object(run_service, "SERVICES", {
+            "sketch_pattern": type("M", (), {
+                "run": staticmethod(lambda path, out, archive=None: (
+                    received_paths.append(path),
+                    received_labels.append(out.run_dir.name),
+                    path,
+                )[-1])
+            })
+        }):
+            run_service.main([
+                "sketch_pattern", "--input", str(folder),
+                "--out", str(self.tmp / "outputs"),
+            ])
+
+        self.assertEqual(len(received_paths), 2)
+        self.assertEqual(
+            {p.name for p in received_paths}, {"a_color.png", "b_color.png"},
+        )
+        self.assertEqual(len(set(received_labels)), 2, received_labels)
+
 
 class RunAllTest(unittest.TestCase):
     def setUp(self):
