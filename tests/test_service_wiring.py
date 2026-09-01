@@ -27,27 +27,30 @@ class ServiceWiringTest(unittest.TestCase):
         self.guide = self.tmp / "가이드라인.png"
         Image.new("RGB", (4, 4)).save(self.guide)
 
+    def _fake_new_session(self):
+        """color_pattern이 Step 1(텍스트)·Step 2(이미지)에 각각 세션을
+        하나씩 열고, sketch_pattern이 Step 1(이미지)에 세션을 하나 더
+        연다. 세 세션이 실제로 소비하는 응답이 다르므로 순서대로 준비한다.
+        """
+        created: list = []
+        responses = [
+            [engine.StepResponse(text=VALID_SURVEY, images=[])],
+            [engine.StepResponse(text="", images=[Image.new("RGB", (4, 4))])],
+            [engine.StepResponse(text="", images=[Image.new("RGB", (4, 4))])],
+        ]
+
+        def fake_new_session(model):
+            client = RecordingClient(responses[len(created)])
+            created.append(client)
+            return client
+
+        return created, fake_new_session
+
     def test_the_two_services_use_different_sessions(self):
         """서비스 경계가 세션 경계다. sketch_pattern이 color_pattern의
         히스토리를 이어받으면, Step 1 명세서(측면 사진 기준 3D 서술) 때문에
         모델이 평면 패턴을 트레이싱하는 대신 3D 신발을 다시 그린다."""
-        created = []
-
-        def fake_new_session(model):
-            # color_pattern 세션은 Step 1(텍스트) + Step 2(이미지) 두 번 부른다.
-            # sketch_pattern 세션은 Step 1(이미지) 한 번만 부른다. 세션마다
-            # 실제로 소비하는 응답 개수가 다르므로 별도로 준비한다.
-            if not created:
-                client = RecordingClient([
-                    engine.StepResponse(text=VALID_SURVEY, images=[]),
-                    engine.StepResponse(text="", images=[Image.new("RGB", (4, 4))]),
-                ])
-            else:
-                client = RecordingClient([
-                    engine.StepResponse(text="", images=[Image.new("RGB", (4, 4))]),
-                ])
-            created.append(client)
-            return client
+        created, fake_new_session = self._fake_new_session()
 
         out = engine.RunOutput(self.tmp / "outputs", "run1")
         archive = engine.HistoryArchive()
@@ -55,51 +58,26 @@ class ServiceWiringTest(unittest.TestCase):
             color_path = color_pattern.run(self.shoe, self.guide, out, archive)
             sketch_pattern.run(color_path, out, archive)
 
-        self.assertEqual(len(created), 2)
+        self.assertEqual(len(created), 3)
         self.assertIsNot(created[0], created[1])
+        self.assertIsNot(created[1], created[2])
 
     def test_sketch_pattern_never_sees_the_survey_text(self):
-        created = []
-
-        def fake_new_session(model):
-            if not created:
-                client = RecordingClient([
-                    engine.StepResponse(text=VALID_SURVEY, images=[]),
-                    engine.StepResponse(text="", images=[Image.new("RGB", (4, 4))]),
-                ])
-            else:
-                client = RecordingClient([
-                    engine.StepResponse(text="", images=[Image.new("RGB", (4, 4))]),
-                ])
-            created.append(client)
-            return client
+        created, fake_new_session = self._fake_new_session()
 
         out = engine.RunOutput(self.tmp / "outputs", "run2")
         with patch.object(engine, "new_session", fake_new_session):
             color_path = color_pattern.run(self.shoe, self.guide, out)
             sketch_pattern.run(color_path, out)
 
-        sketch_texts = [p for p in created[1].calls[0]["parts"] if p["kind"] == "text"]
+        sketch_texts = [p for p in created[2].calls[0]["parts"] if p["kind"] == "text"]
         survey_len = len(f"[Previous Step 1 Output]\n{VALID_SURVEY}")
         self.assertFalse(any(t["len"] == survey_len for t in sketch_texts))
 
     def test_archive_keeps_turns_from_both_services(self):
-        """세션이 둘이므로 합쳐두지 않으면 앞 서비스의 턴이
+        """세션이 셋이므로 합쳐두지 않으면 앞 세션들의 턴이
         chat_history.json에서 사라진다."""
-        created = []
-
-        def fake_new_session(model):
-            if not created:
-                client = RecordingClient([
-                    engine.StepResponse(text=VALID_SURVEY, images=[]),
-                    engine.StepResponse(text="", images=[Image.new("RGB", (4, 4))]),
-                ])
-            else:
-                client = RecordingClient([
-                    engine.StepResponse(text="", images=[Image.new("RGB", (4, 4))]),
-                ])
-            created.append(client)
-            return client
+        created, fake_new_session = self._fake_new_session()
 
         out = engine.RunOutput(self.tmp / "outputs", "run3")
         archive = engine.HistoryArchive()

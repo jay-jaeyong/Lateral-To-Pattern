@@ -49,25 +49,36 @@ class ServiceTest(unittest.TestCase):
         self.guide = self.tmp / "가이드라인.png"
         Image.new("RGB", (4, 4)).save(self.guide)
 
-    def _run(self):
-        client = RecordingClient([
+    def _run(self, archive=None):
+        survey_client = RecordingClient([
             engine.StepResponse(text=VALID_SURVEY, images=[]),
+        ])
+        unfold_client = RecordingClient([
             engine.StepResponse(text="", images=[Image.new("RGB", (4, 4))]),
         ])
-        out = engine.RunOutput(self.tmp / "outputs", "run1")
-        with patch.object(service.engine, "new_session", lambda model: client):
-            path = service.run(self.shoe, self.guide, out)
-        return client, path
+        clients = [survey_client, unfold_client]
+        models: list[str] = []
 
-    def test_service_opens_exactly_one_session_for_two_steps(self):
-        """두 스텝은 세션을 공유한다. 정면·뒤꿈치·위 사진이 히스토리로만
-        Step 2에 닿는 현 구조를 유지하기 위해서다."""
-        client, _ = self._run()
-        self.assertEqual(len(client.calls), 2)
+        def fake_new_session(model):
+            models.append(model)
+            return clients.pop(0)
+
+        out = engine.RunOutput(self.tmp / "outputs", "run1")
+        with patch.object(service.engine, "new_session", fake_new_session):
+            path = service.run(self.shoe, self.guide, out, archive=archive)
+        return survey_client, unfold_client, models, path
+
+    def test_service_opens_two_sessions_for_two_steps(self):
+        """Step 1과 Step 2는 서로 다른 모델을 쓰므로 세션도 따로 연다.
+        세션이 갈리면서 정면·위 사진은 더 이상 Step 2로 넘어가지 않는다."""
+        survey_client, unfold_client, models, _ = self._run()
+        self.assertEqual(models, [service.PART_SURVEY_MODEL, service.PATTERN_UNFOLD_MODEL])
+        self.assertEqual(len(survey_client.calls), 1)
+        self.assertEqual(len(unfold_client.calls), 1)
 
     def test_step_1_survey_text_reaches_step_2_verbatim(self):
-        client, _ = self._run()
-        step2_texts = [p for p in client.calls[1]["parts"] if p["kind"] == "text"]
+        _, unfold_client, _, _ = self._run()
+        step2_texts = [p for p in unfold_client.calls[0]["parts"] if p["kind"] == "text"]
         self.assertTrue(any(
             t["len"] == len(f"[Previous Step 1 Output]\n{VALID_SURVEY}")
             for t in step2_texts
@@ -75,13 +86,21 @@ class ServiceTest(unittest.TestCase):
 
     def test_service_returns_the_saved_color_pattern_path(self):
         """서비스 간 핸드오프는 파일이다."""
-        _, path = self._run()
+        _, _, _, path = self._run()
         self.assertTrue(path.exists())
         self.assertEqual(path.suffix, ".png")
         self.assertEqual(path.parent.name, "color_pattern")
 
     def test_model_is_declared_by_the_service(self):
-        self.assertEqual(service.MODEL, "gemini-3.1-flash-image")
+        self.assertEqual(service.PART_SURVEY_MODEL, "gemini-3.6-flash")
+        self.assertEqual(service.PATTERN_UNFOLD_MODEL, "gemini-3.1-flash-image")
+
+    def test_archive_receives_both_sessions_histories_in_order(self):
+        """chat_history.json이 전체 대화를 유지하려면 세션이 갈려도
+        Step 1 다음 Step 2 순서로 히스토리가 모두 archive에 쌓여야 한다."""
+        archive = engine.HistoryArchive()
+        survey_client, unfold_client, _, _ = self._run(archive=archive)
+        self.assertEqual(archive.all(), survey_client.history + unfold_client.history)
 
     def test_missing_generated_image_raises_instead_of_returning_a_ghost_path(self):
         """Gemini가 안전 필터 등으로 이미지 없이 응답하면, 존재하지 않는

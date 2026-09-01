@@ -57,8 +57,9 @@ SAFETY_SETTINGS = [
 # ─────────────────────────────────────────────
 # 채팅 세션 GenerateContentConfig
 # ─────────────────────────────────────────────
-# thinking_level은 gemini-3.1-flash-image에서만 받습니다. gemini-3-pro-image로
-# 되돌릴 때는 이 상수와 아래 두 군데의 thinking_config를 함께 지우세요.
+# thinking_level은 여기서 쓰는 모델들(gemini-3.6-flash, gemini-3.1-flash-image)이
+# 받습니다. 이 값을 받지 않는 모델로 되돌릴 때는 이 상수와 아래 두 군데의
+# thinking_config를 함께 지우세요.
 THINKING_CONFIG = types.ThinkingConfig(thinking_level="HIGH")
 
 CHAT_CONFIG = types.GenerateContentConfig(

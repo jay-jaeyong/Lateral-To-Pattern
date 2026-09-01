@@ -28,9 +28,9 @@ EXTENSIONS = ("webp", "jpg", "jpeg", "png")
 # Step 2가 직접 받는 뷰. 나머지는 채팅 히스토리로만 닿는다.
 UNFOLD_VIEWS = ("lateral", "medial")
 
-# Step 1 survey에서 제외하는 뷰. heel 라벨/이미지는 부품 명세서 단계에
-# 쓰지 않는다. 같은 채팅 세션이므로 여기서 빼면 Step 2 히스토리에도
-# heel 이미지가 남지 않는다.
+# Step 1 survey에서 제외하는 뷰. heel 라벨/이미지는 부품 명세서 프롬프트가
+# 애초에 쓰지 않는다. Step 2가 heel을 못 보는 것은 이것과 무관하게
+# UNFOLD_VIEWS가 lateral·medial만 고르기 때문이다.
 SURVEY_EXCLUDE_VIEWS = ("heel",)
 
 # 가이드라인 이미지 앞에 붙는 라벨. core/_parts_builder.py의 GUIDE_LABEL을
