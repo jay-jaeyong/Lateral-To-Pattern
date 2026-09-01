@@ -1,7 +1,9 @@
 """services/engine.py 세션·저장·히스토리 테스트."""
 
+import gc
 import tempfile
 import unittest
+import weakref
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -18,6 +20,29 @@ class NewSessionTest(unittest.TestCase):
             engine.new_session("some-model")
         kwargs = mock_genai.Client.return_value.chats.create.call_args.kwargs
         self.assertEqual(kwargs["model"], "some-model")
+
+    def test_new_session_keeps_client_alive_after_gc(self):
+        """chat은 client의 httpx 연결에 의존한다. new_session이 client를
+        로컬 변수로만 들고 있으면 GC 시 client가 수거되어 httpx 연결이
+        끊긴다. Session이 client를 계속 참조해 살아있어야 한다."""
+        with patch.object(engine, "genai") as mock_genai, \
+             patch.object(engine, "get_api_key", return_value="test-key"):
+            client_instance = mock_genai.Client.return_value
+            client_ref = weakref.ref(client_instance)
+            session = engine.new_session("some-model")
+
+        # new_session의 지역 변수 client, 그리고 mock_genai(테스트용 patch
+        # 대상)까지 스코프를 벗어나야 실제 상황(요청 함수 반환 후 client가
+        # 다른 곳에서 참조되지 않는 상황)을 재현한다.
+        del client_instance
+        del mock_genai
+        gc.collect()
+
+        self.assertIsNotNone(
+            client_ref(),
+            "Session이 client를 붙잡고 있지 않아 GC로 수거되었습니다.",
+        )
+        self.assertIs(session._client, client_ref())
 
     def test_send_retries_then_raises(self):
         with patch.object(engine, "genai") as mock_genai, \

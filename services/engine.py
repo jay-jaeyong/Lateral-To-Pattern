@@ -44,8 +44,12 @@ class StepResponse:
 class Session:
     """Gemini 채팅 세션. 히스토리를 유지하며 멀티모달 입출력을 다룬다."""
 
-    def __init__(self, chat) -> None:
+    def __init__(self, chat, client=None) -> None:
         self._chat = chat
+        # chat은 내부적으로 client의 httpx 연결을 참조한다. client가 로컬
+        # 변수로만 존재하면 GC 시 httpx 클라이언트가 닫혀 chat이 끊긴다.
+        # Session이 살아있는 동안 client도 함께 살려둔다.
+        self._client = client
 
     @property
     def history(self) -> list:
@@ -368,7 +372,7 @@ def new_session(model: str) -> Session:
     """새 Gemini 채팅 세션을 만든다. 모델은 서비스가 정한다."""
     client = genai.Client(api_key=get_api_key())
     chat = client.chats.create(model=model, config=CHAT_CONFIG)
-    return Session(chat)
+    return Session(chat, client=client)
 
 
 class RunOutput:
