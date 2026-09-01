@@ -70,6 +70,18 @@ class BuildPartsTest(unittest.TestCase):
         self.assertEqual(parts[-1], "PROMPT")
         self.assertEqual(len(parts), 5)
 
+    def test_survey_parts_exclude_heel_view_even_when_resolved(self):
+        """resolve()는 heel 파일을 찾아도 되지만, survey에는 절대 보내지 않는다."""
+        Image.new("RGB", (4, 4)).save(self.shoe / "heel.png")
+        photos = photo_input.resolve(self.shoe)
+        self.assertIn("뒤쪽에서 본 모습(heel)", [label for label, _ in photos])
+
+        parts = photo_input.build_survey_parts(photos, "PROMPT")
+        text_parts = [p for p in parts if isinstance(p, str)]
+        self.assertNotIn("[뒤쪽에서 본 모습(heel)]", text_parts)
+        # lateral, medial 두 쌍(라벨+이미지) + 프롬프트만 남는다.
+        self.assertEqual(len(parts), 5)
+
     def test_unfold_parts_are_exactly_the_eight_parts_in_order(self):
         parts = photo_input.build_unfold_parts(
             photo_input.resolve(self.shoe), self.guide, "명세서 본문", "PROMPT"

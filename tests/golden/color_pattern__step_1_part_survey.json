@@ -54,20 +54,6 @@
     },
     {
       "kind": "text",
-      "len": 17,
-      "sha256": "8c55d22900776b3adddab5478ca4105e8546aa90cf12bd46c8b24c1a25d2510f"
-    },
-    {
-      "kind": "pil",
-      "mode": "RGB",
-      "sha256": "3d626e11b4dfea872288c023275e6ed354cd836a0168987457a5777907265aca",
-      "size": [
-        6,
-        6
-      ]
-    },
-    {
-      "kind": "text",
       "len": 15,
       "sha256": "138b13166259516587493ec8b072a9077cf2354bcd86e6ae82c65a29d7884b43"
     },
@@ -82,8 +68,8 @@
     },
     {
       "kind": "text",
-      "len": 11777,
-      "sha256": "4cdebd4e5d869063c70037e115975f07a5994ee98d567a29eb2433b0988a222a"
+      "len": 10815,
+      "sha256": "aa8f72e58a61fd09cabcc17133b39ed3cfa6c4ca578b75e5697b00d5433c6b32"
     }
   ]
 }

@@ -28,6 +28,11 @@ EXTENSIONS = ("webp", "jpg", "jpeg", "png")
 # Step 2가 직접 받는 뷰. 나머지는 채팅 히스토리로만 닿는다.
 UNFOLD_VIEWS = ("lateral", "medial")
 
+# Step 1 survey에서 제외하는 뷰. heel 라벨/이미지는 부품 명세서 단계에
+# 쓰지 않는다. 같은 채팅 세션이므로 여기서 빼면 Step 2 히스토리에도
+# heel 이미지가 남지 않는다.
+SURVEY_EXCLUDE_VIEWS = ("heel",)
+
 # 가이드라인 이미지 앞에 붙는 라벨. core/_parts_builder.py의 GUIDE_LABEL을
 # 값 그대로 옮긴 것이다. 라벨이 없으면 모델이 이 틀을 신발 사진 중 하나로 읽는다.
 GUIDE_LABEL = "[가이드라인] 2D 펼침 틀 — 신발 사진이 아니야"
@@ -60,9 +65,16 @@ def resolve(shoe_dir: Path) -> list[tuple[str, Path]]:
 
 
 def build_survey_parts(photos: list[tuple[str, Path]], prompt: str) -> list:
-    """[라벨, 이미지] 쌍을 뷰 순서대로 늘어놓고 끝에 프롬프트를 둔다."""
+    """[라벨, 이미지] 쌍을 뷰 순서대로 늘어놓고 끝에 프롬프트를 둔다.
+
+    SURVEY_EXCLUDE_VIEWS에 속한 뷰(heel)는 resolve()가 찾아냈어도 여기서
+    걸러낸다.
+    """
+    excluded = {label for name, label in VIEW_LABELS if name in SURVEY_EXCLUDE_VIEWS}
     parts: list = []
     for view_label, path in photos:
+        if view_label in excluded:
+            continue
         parts.append(images.label(view_label))
         parts.append(images.load(path))
     parts.append(prompt)
